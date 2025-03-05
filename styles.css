@@ -1,0 +1,2436 @@
+/* ==================== GLOBAL STYLES ==================== */
+body {
+    background: #f0eeec;
+    margin: 0;
+    font-family: 'Rajdhani', sans-serif;
+    line-height: 1.6;
+    padding: 0;
+}
+
+/* ==================== TYPOGRAPHY ==================== */
+h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    margin-top: 150px;
+}
+
+h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 1.8rem;
+    margin: 0;
+    text-align: center;
+}
+
+h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 300;
+}
+
+h4 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 300;
+}
+
+h5 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 300;
+}
+
+h6 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 300;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ==================== COMMON ELEMENTS ==================== */
+button {
+    padding: 12px 20px;
+    background-color: #a7a39e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+button:hover {
+    background-color: #8c857d;
+}
+
+/* ==================== FORM ELEMENTS ==================== */
+.form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-group input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.form-container {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ==================== BUTTONS ==================== */
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: #a7a39e;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.btn:hover {
+    background-color: #8c857d;
+}
+
+/* Support for Bootstrap-style button classes used in admin pages */
+.btn-primary, .btn-danger, .btn-sm {
+    /* Override with our standard button style */
+    background-color: #a7a39e !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.btn-primary:hover, .btn-danger:hover {
+    background-color: #8c857d !important;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Keep only the remove button as it has special styling and is used extensively */
+.remove-btn {
+    background: transparent;
+    color: #ff4444;
+    border: none;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: absolute;
+    right: 5px;
+    top: 12px;
+    font-size: 1rem;
+    z-index: 2;
+    padding: 0;
+}
+
+.remove-btn:hover {
+    color: #cc0000;
+    background: transparent;
+}
+
+/* Edit button styling */
+.edit-btn {
+    background: transparent;
+    color: #000000;
+    border: none;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: absolute;
+    right: 34px;
+    top: 12px;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+
+.edit-btn:hover {
+    color: #555555;
+    transform: scale(1.1);
+    background: transparent;
+}
+
+/* Edit input field styling */
+.edit-input {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.edit-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Save and cancel buttons styling */
+.save-edit-btn, .cancel-edit-btn {
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-left: 5px;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.save-edit-btn {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.save-edit-btn:hover {
+    background-color: rgba(40, 167, 69, 0.2);
+    color: #218838;
+    transform: scale(1.1);
+}
+
+.cancel-edit-btn {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.cancel-edit-btn:hover {
+    background-color: rgba(108, 117, 125, 0.2);
+    color: #5a6268;
+    transform: scale(1.1);
+}
+
+/* ==================== MESSAGES AND ALERTS ==================== */
+.error-message {
+    color: #d9534f;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.success-message {
+    color: #5cb85c;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.flash-messages {
+    margin-bottom: 20px;
+}
+
+.flash-message {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.flash-message.success {
+    background-color: #dff0d8;
+    color: #3c763d;
+    border: 1px solid #d6e9c6;
+}
+
+.flash-message.error {
+    background-color: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* ==================== HEADER AND NAVIGATION ==================== */
+.header {
+    background-color: white;
+    height: 110px;
+    width: 100%;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 2000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.header h1, .header h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+.navbar {
+    padding: 0.5rem 1rem;
+}
+
+.nav-links {
+    display: flex;
+    gap: 20px;
+}
+
+.nav-links a {
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: #007bff;
+}
+
+.navbar-links {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 20px;
+}
+
+.navbar-links a {
+    text-decoration: none;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0 10px;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.navbar-links a::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #a7a39e, transparent);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.15s ease;
+}
+
+.navbar-links a:hover {
+    background-color: rgba(240, 244, 248, 0.5);
+    color: #000;
+    text-decoration: none;
+}
+
+.navbar-links a:hover::before {
+    transform: scaleX(1);
+}
+
+.navbar-links a.active {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.1) 0%, rgba(140, 133, 125, 0.2) 100%);
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-links a.active::before {
+    transform: scaleX(1);
+    background: linear-gradient(90deg, transparent, #8c857d, transparent);
+    height: 3px;
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 15px;
+    margin: 15px;
+    margin-right: 30px;
+}
+
+.back-btn, .logout-btn, .profile-btn, .admin-btn {
+    text-decoration: none;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    display: inline-block;
+    border: none;
+    background-color: rgba(167, 163, 158, 0.1);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.back-btn:hover, .profile-btn:hover, .logout-btn:hover, .admin-btn:hover {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.2) 0%, rgba(140, 133, 125, 0.3) 100%);
+    color: #000;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== CARD STYLES ==================== */
+.card {
+    margin-top: 10px;
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    margin-top: 10; 
+}
+
+/* ==================== TABLE STYLES ==================== */
+.table-responsive {
+    overflow-x: auto;
+}
+
+/* ==================== PAGE SPECIFIC STYLES ==================== */
+/* ----- Login and Registration Pages ----- */
+.auth-centered, .login-page body, .register-page body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.login-container, .register-container {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    width: 350px;
+    text-align: center;
+}
+
+.register-container {
+    width: 400px;
+}
+
+.login-container h2, .register-container h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.login-container input, .register-container input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.login-container button, .register-container button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+.login-container p, .register-container p {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.register-link {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+/* ----- Authentication Pages ----- */
+.auth-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+}
+
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 450px;
+    margin: 0 auto;
+}
+
+.login-logo {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.login-logo h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 2.5rem;
+    margin: 0;
+    background: linear-gradient(135deg, #333 0%, #666 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+}
+
+.logo-accent {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 1.2rem;
+    color: #666;
+    letter-spacing: 3px;
+    margin-top: -5px;
+}
+
+.luxury-login .auth-form {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 2.5rem;
+    transition: all 0.15s ease;
+    width: 100%;
+}
+
+.luxury-login .auth-form:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.luxury-login .auth-form h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: #333;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.luxury-input label {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.input-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.input-wrapper i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    transition: all 0.15s ease;
+}
+
+.luxury-input input {
+    width: 100%;
+    padding: 12px 12px 12px 45px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.8);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.luxury-input input:focus {
+    outline: none;
+    border-color: #a7a39e;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(167, 163, 158, 0.2);
+    transform: translateY(-1px);
+}
+
+.luxury-input input:focus + i {
+    color: #a7a39e;
+    transform: translateY(-50%) scale(1.05);
+}
+
+.luxury-input input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.luxury-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: all 0.15s ease;
+}
+
+.luxury-btn:hover {
+    background: linear-gradient(135deg, #8c857d 0%, #6e6a65 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.luxury-btn:hover::before {
+    left: 100%;
+}
+
+/* Luxury Login Styling */
+.luxury-login {
+    background-color: #f0eeec;
+    position: relative;
+    overflow: hidden;
+}
+
+.login-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(240,238,236,0.9) 0%, rgba(225,223,220,0.8) 100%);
+    z-index: -1;
+}
+
+.login-backdrop::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+    animation: none;
+    z-index: -1;
+}
+
+/* Subtle luxury pattern */
+.login-backdrop::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%), 
+        linear-gradient(-45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    z-index: -1;
+}
+
+/* Input field animation - keeping minimal animation for login/register */
+@keyframes inputFadeIn {
+    0% {
+        opacity: 0.8;
+        transform: translateY(3px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.luxury-input {
+    animation: inputFadeIn 0.2s ease forwards;
+}
+
+.luxury-input:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.luxury-input:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.luxury-input:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.luxury-input:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+/* Button animation - keeping minimal animation for login/register */
+@keyframes buttonFadeIn {
+    0% {
+        opacity: 0.8;
+        transform: translateY(3px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.luxury-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #a7a39e 0%, #8c857d 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 1rem;
+    position: relative;
+    overflow: hidden;
+    animation: buttonFadeIn 0.2s ease forwards;
+    animation-delay: 0.1s;
+    opacity: 0.8;
+}
+
+/* Adjust button animation delay for register page */
+.luxury-login form:has(.luxury-input:nth-child(4)) .luxury-btn {
+    animation-delay: 0.1s;
+}
+
+.luxury-login .register-link {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: #666;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding-top: 1.5rem;
+}
+
+.luxury-login .register-link a {
+    color: #a7a39e;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.luxury-login .register-link a:hover {
+    color: #6e6a65;
+    text-decoration: none;
+}
+
+/* Enhance register form for premium feel */
+.luxury-login .auth-form:has(form .luxury-input:nth-child(4)) {
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.12);
+}
+
+.luxury-login .auth-form:has(form .luxury-input:nth-child(4)) h2 {
+    background: linear-gradient(135deg, #333 0%, #555 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 600;
+}
+
+/* Add subtle separator between form fields in register */
+.luxury-login form:has(.luxury-input:nth-child(4)) .luxury-input:not(:last-child) {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+    padding-bottom: 0.5rem;
+}
+
+/* ----- Profile and Admin Pages ----- */
+.profile-container, .admin-container {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.admin-container {
+    max-width: 1200px;
+    margin-top: 120px;
+}
+
+.profile-container h2, .admin-container h2 {
+    font-weight: 600;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-top: 120px;
+}
+
+.profile-section {
+    margin-bottom: 30px;
+}
+
+.profile-section h3 {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+/* ----- Admin Table Styles ----- */
+.admin-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 120px;
+}
+
+.admin-container th, .admin-container td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.admin-container th {
+    background-color: #f2f2f2;
+    font-weight: 600;
+}
+
+.admin-container tr:hover {
+    background-color: #f5f5f5;
+}
+
+.user-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* ----- Admin Users Page ----- */
+.admin-users-heading {
+    text-align: center;
+    align-items: center;
+    margin-top: 130px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #333 0%, #666 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+    margin-bottom: 1.5rem;
+    animation: none;
+}
+
+/* ----- Role Management Styles ----- */
+.role-form {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.role-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.role-admin {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.role-user {
+    color: #2196F3;
+}
+
+/* ----- Index Page Specific Styles ----- */
+.index-page body, .luxury-dashboard {
+    background: #f0eeec;
+    margin: 0;
+    padding-top: 110px;
+    font-family: 'Rajdhani', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Add luxury backdrop to index page */
+.index-page body::before, .luxury-dashboard::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(240,238,236,0.95) 0%, rgba(225,223,220,0.9) 100%);
+    z-index: -1;
+}
+
+/* Add subtle luxury pattern to index page */
+.index-page body::after, .luxury-dashboard::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%), 
+        linear-gradient(-45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    z-index: -1;
+    opacity: 0.7;
+}
+
+/* Luxury header styling */
+.header {
+    background: rgba(255, 255, 255, 0.9);
+    height: 110px;
+    width: 100%;
+    border-radius: 0 0 15px 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 2000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 30px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.header h1, .header h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #333 0%, #666 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+}
+
+/* Navbar links luxury styling */
+.navbar-links {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 20px;
+}
+
+.navbar-links a {
+    text-decoration: none;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0 10px;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.navbar-links a::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #a7a39e, transparent);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.15s ease;
+}
+
+.navbar-links a:hover {
+    background-color: rgba(240, 244, 248, 0.5);
+    color: #000;
+    text-decoration: none;
+}
+
+.navbar-links a:hover::before {
+    transform: scaleX(1);
+}
+
+.navbar-links a.active {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.1) 0%, rgba(140, 133, 125, 0.2) 100%);
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-links a.active::before {
+    transform: scaleX(1);
+    background: linear-gradient(90deg, transparent, #8c857d, transparent);
+    height: 3px;
+}
+
+/* Nav buttons luxury styling */
+.nav-buttons {
+    display: flex;
+    gap: 15px;
+    margin: 15px;
+    margin-right: 50px;
+}
+
+.back-btn, .logout-btn, .profile-btn, .admin-btn {
+    text-decoration: none;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    display: inline-block;
+    border: none;
+    background-color: rgba(167, 163, 158, 0.1);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.back-btn:hover, .profile-btn:hover, .logout-btn:hover, .admin-btn:hover {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.2) 0%, rgba(140, 133, 125, 0.3) 100%);
+    color: #000;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Resources box luxury styling */
+.resources-box {
+    position: fixed;
+    top: 130px;
+    left: 20px;
+    z-index: 2002;
+    border: none;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    max-height: 450px;
+    width: 300px;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.15s ease;
+}
+
+.resources-box:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.resources-box h3 {
+    margin: 0;
+    padding-bottom: 15px;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 1.2rem;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #333 0%, #555 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.resource-item {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 12px 12px 12px 15px;
+    margin: 8px 0;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    cursor: move;
+    display: flex;
+    align-items: flex-start;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    width: 90%;
+    position: relative;
+    min-height: 24px;
+}
+
+/* Add a text container for the resource item text */
+.resource-item-text {
+    flex: 1;
+    overflow: visible;
+    white-space: normal;
+    word-wrap: break-word;
+    padding-right: 65px; /* Make space for the buttons */
+    padding-top: 2px;
+    padding-bottom: 2px;
+    min-height: 20px;
+   font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 1rem; 
+}
+
+/* Specific styling for resource items in risk columns */
+.risk-column .resource-item {
+    width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+}
+
+.resource-item:hover {
+    background: #fff;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px) scale(1.01);
+}
+
+.resource-item.dragging {
+    opacity: 0.7;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transform: scale(1.03);
+    z-index: 1000;
+}
+
+.remove-btn {
+    background: transparent;
+    color: #ff4444;
+    border: none;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: absolute;
+    right: 5px;
+    top: 12px;
+    font-size: 1rem;
+    z-index: 2;
+    padding: 0;
+}
+
+.remove-btn:hover {
+    color: #cc0000;
+    background: transparent;
+}
+
+.add-item-form {
+    position: fixed;
+    top: 623px;
+    left: 20px;
+    z-index: 2002;
+    width: 300px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 0.9rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.add-item-form:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.add-item-form input {
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    width: 98.5%;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
+
+.add-item-form input:focus {
+    outline: none;
+    border-color: #a7a39e;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(167, 163, 158, 0.2);
+}
+
+.add-item-form button {
+    padding: 10px 15px;
+    background: linear-gradient(135deg, #a7a39e 0%, #8c857d 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    width: 100%;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+}
+
+.add-item-form button:hover {
+    background: linear-gradient(135deg, #8c857d 0%, #6e6a65 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Risk Columns Luxury Styling */
+.entity-row {
+    border: none;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(240, 238, 236, 0.5);
+    margin-left: 380px;
+    margin-right: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+.entity-row:first-of-type {
+    margin-top: 130px;
+}
+
+.entity-row:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    transform: translateY(-3px);
+}
+
+.entity-title {
+    margin-top: 0;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+    margin-left: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1.2rem;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #333 0%, #555 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.risk-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-left: 10px;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.risk-column {
+    border: none;
+    padding: 15px;
+    border-radius: 10px;
+    min-height: 120px;
+    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.risk-column h3 {
+    margin: 0;
+    padding-bottom: 10px;
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    margin-bottom: 10px;
+    width: 100%;
+    text-align: center;
+}
+
+.no-risk {
+    background: rgba(232, 245, 233, 0.8);
+}
+
+.at-risk {
+    background: rgba(255, 243, 224, 0.8);
+}
+
+.high-risk {
+    background: rgba(255, 235, 238, 0.8);
+}
+
+.risk-column.drop-target-highlight {
+    border: 2px dashed rgba(76, 175, 80, 0.5);
+    background-color: rgba(76, 175, 80, 0.05);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.2);
+    transform: scale(1.02);
+}
+
+.risk-column.active-drop-target {
+    border: 2px solid rgba(76, 175, 80, 0.7);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    background-color: rgba(76, 175, 80, 0.1);
+    transform: scale(1.03);
+}
+
+/* ----- Touch Device Styles ----- */
+#touch-indicator {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px dashed #4CAF50;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    color: #333;
+    transition: transform 0.1s ease;
+}
+
+@media (hover: none) {
+    /* Styles for touch devices */
+    .resource-item {
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+    }
+    
+    .resource-item:active {
+        cursor: grabbing;
+        opacity: 0.7;
+    }
+    
+    .risk-column {
+        transition: all 0.3s ease;
+        min-height: 120px;
+    }
+    
+    .risk-column::after {
+        content: "Drop here";
+        display: block;
+        text-align: center;
+        color: #aaa;
+        font-style: italic;
+        margin-top: 10px;
+        font-size: 0.8rem;
+        opacity: 0.5;
+    }
+    
+    .risk-column.drop-target-highlight::after {
+        content: "Drop here";
+        color: #4CAF50;
+        opacity: 0.8;
+    }
+    
+    .risk-column.active-drop-target::after {
+        content: "Release to drop!";
+        color: #4CAF50;
+        font-weight: bold;
+        opacity: 1;
+    }
+}
+
+/* ==================== RESPONSIVE STYLES ==================== */
+@media (max-width: 1200px) {
+    .risk-columns {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+    
+    .entity-row {
+        margin-left: 370px;
+        margin-right: 20px;
+    }
+}
+
+@media (max-width: 992px) {
+    .navbar-links {
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+    
+    .entity-row {
+        margin-left: 20px;
+    }
+    
+    .risk-columns {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .luxury-login .auth-form {
+        width: 90%;
+    }
+    
+    .login-logo h1 {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .login-container, .register-container {
+        width: 90%;
+        max-width: 400px;
+    }
+    
+    .profile-container, .admin-container {
+        margin-top: 120px;
+        width: 90%;
+        margin: 0 auto;
+    }
+    
+    .header {
+        flex-direction: column;
+        text-align: center;
+        height: auto;
+        padding: 10px;
+    }
+    
+    .navbar-links {
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 10px 0;
+    }
+    
+    .navbar-links a {
+        margin: 5px;
+        white-space: nowrap;
+    }
+    
+    .nav-buttons {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-top: 10px;
+        justify-content: center;
+    }
+    
+    .resources-box {
+        position: relative;
+        top: 20px;
+        left: 0;
+        width: 90%;
+        margin: 0 auto 20px;
+        max-height: 300px;
+    }
+    
+    .add-item-form {
+        position: relative;
+        top: 20px;
+        left: 0;
+        width: 90%;
+        margin: 0 auto 20px;
+    }
+    
+    .entity-row {
+        margin: 40px 10px 20px;
+    }
+    
+    .risk-columns {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    table {
+        display: block;
+        overflow-x: auto;
+    }
+    
+    .header h1, .header h2, 
+    .admin-users-heading, .profile-container h2, .admin-container h2 {
+        font-size: 2rem;
+    }
+    
+    /* Luxury Login Responsive */
+    .auth-container {
+        width: 90%;
+        padding: 20px;
+    }
+    
+    .luxury-login .auth-form {
+        padding: 1.5rem;
+    }
+    
+    .login-logo h1 {
+        font-size: 2rem;
+    }
+    
+    .logo-accent {
+        font-size: 1rem;
+    }
+    
+    .luxury-login .auth-form h2 {
+        font-size: 1.8rem;
+    }
+    
+    /* Register page specific responsive */
+    .luxury-login .auth-form:has(form .luxury-input:nth-child(4)) {
+        padding: 1.5rem;
+        max-width: 450px;
+        margin: 0 auto;
+    }
+    
+    .entity-row {
+        padding: 15px;
+    }
+    
+    .risk-columns {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+    
+    .indicators {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .indicator {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 576px) {
+    .header h1, .header h2, 
+    .admin-users-heading, .profile-container h2, .admin-container h2 {
+        font-size: 1.8rem;
+    }
+    
+    .nav-buttons {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .navbar-links {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .navbar-links a {
+        margin: 2px 0;
+    }
+    
+    .back-btn, .logout-btn, .profile-btn, .admin-btn {
+        padding: 5px 10px;
+        font-size: 1rem;
+        margin: 2px 0;
+    }
+    
+    .resources-box, .add-item-form {
+        top: 240px;
+    }
+    
+    .entity-row {
+        margin-top: 260px;
+    }
+    
+    .risk-columns {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        width: 100%;
+    }
+    
+    .entity-title {
+        margin-left: 0;
+        text-align: center;
+    }
+    
+    .admin-container th, .admin-container td {
+        padding: 5px;
+        font-size: 0.9rem;
+    }
+    
+    .user-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .role-form {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .role-select, .update-role-btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    /* Luxury Login Responsive */
+    .luxury-login .auth-form {
+        padding: 1.2rem;
+    }
+    
+    .login-logo h1 {
+        font-size: 1.8rem;
+    }
+    
+    .logo-accent {
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+    }
+    
+    .luxury-login .auth-form h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .luxury-input label {
+        font-size: 0.8rem;
+    }
+    
+    .luxury-input input {
+        padding: 10px 10px 10px 40px;
+    }
+    
+    .luxury-btn {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    /* Register page specific responsive */
+    .luxury-login .auth-form:has(form .luxury-input:nth-child(4)) {
+        padding: 1rem;
+    }
+    
+    .luxury-login form:has(.luxury-input:nth-child(4)) .luxury-input {
+        margin-bottom: 0.8rem;
+    }
+    
+    .entity-row {
+        padding: 10px;
+    }
+    
+    .risk-columns {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .indicators {
+        margin-top: 15px;
+        padding-top: 15px;
+    }
+    
+    .indicator {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+    }
+}
+
+/* Custom badge colors for user roles */
+.badge-admin {
+    background-color: #928b84; /* Purple color for admin */
+    color: white;
+}
+
+.badge-user {
+    background-color: #8e8c9c; /* Cyan color for user */
+    color: white;
+}
+
+/* Luxury dashboard enhancements */
+.luxury-dashboard .header {
+    animation: none;
+}
+
+.luxury-dashboard .resources-box {
+    animation: none;
+}
+
+.luxury-dashboard .add-item-form {
+    animation: none;
+    animation-delay: 0;
+}
+
+.luxury-dashboard .entity-row {
+    animation: none;
+    animation-delay: 0;
+    opacity: 1;
+}
+
+.luxury-dashboard .entity-row:nth-child(1) {
+    --row-index: 1;
+    opacity: 1;
+    animation: none;
+}
+
+.luxury-dashboard .entity-row:nth-child(2) {
+    --row-index: 2;
+    opacity: 1;
+    animation: none;
+}
+
+.luxury-dashboard .entity-row:nth-child(3) {
+    --row-index: 3;
+    opacity: 1;
+    animation: none;
+}
+
+.luxury-dashboard .entity-row:nth-child(4) {
+    --row-index: 4;
+    opacity: 1;
+    animation: none;
+}
+
+.luxury-dashboard .entity-row:nth-child(5) {
+    --row-index: 5;
+    opacity: 1;
+    animation: none;
+}
+
+/* Dashboard animations - simplified and kept for reference but not used */
+@keyframes fadeInDown {
+    from {
+        opacity: 0.9;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInLeft {
+    from {
+        opacity: 0.9;
+        transform: translateX(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0.9;
+        transform: translateX(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Enhance risk columns with subtle hover effects */
+.luxury-dashboard .risk-column:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+}
+
+/* Add subtle icon styling */
+.luxury-dashboard .nav-buttons a i {
+    margin-right: 5px;
+    transition: all 0.15s ease;
+}
+
+.luxury-dashboard .nav-buttons a:hover i {
+    transform: scale(1.1);
+}
+
+/* ==================== LUXURY PROFILE STYLES ==================== */
+.luxury-profile {
+    background: #F0EEEC;
+    margin: 0;
+    font-family: 'Rajdhani', sans-serif;
+    line-height: 1.6;
+    padding: 0;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.luxury-profile::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(240,238,236,0.8) 100%);
+    z-index: -2;
+}
+
+.luxury-profile::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.4;
+    z-index: -1;
+}
+
+.luxury-profile .header {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-radius: 0 0 15px 15px;
+    margin-bottom: 30px;
+    animation: none;
+}
+
+.luxury-profile .header h2 {
+    margin: 0;
+    background: linear-gradient(135deg, #333 0%, #111 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 600;
+    letter-spacing: 1px;
+    font-size: 1.8rem;
+}
+
+.luxury-container {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 30px;
+    max-width: 800px;
+    margin: 30px auto;
+    transition: all 0.15s ease;
+    animation: none;
+}
+
+.luxury-container:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.luxury-container h2 {
+    font-size: 2rem;
+    margin-bottom: 25px;
+    background: linear-gradient(135deg, #333 0%, #111 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 600;
+    letter-spacing: 1px;
+    position: relative;
+    padding-bottom: 10px;
+}
+
+.luxury-container h2::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, #333, #999);
+    border-radius: 3px;
+}
+
+.luxury-section {
+    margin-bottom: 30px;
+    animation: none;
+}
+
+.luxury-section h3 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #333;
+    font-weight: 500;
+}
+
+.luxury-section .password-heading {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.luxury-profile .luxury-input {
+    margin-bottom: 20px;
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-profile .luxury-input:nth-child(1) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(2) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(3) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(4) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(5) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(6) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input:nth-child(7) {
+    animation-delay: 0;
+}
+
+.luxury-profile .luxury-input label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.luxury-profile .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.luxury-profile .input-wrapper i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    transition: all 0.15s ease;
+}
+
+.luxury-profile .luxury-input input {
+    width: 100%;
+    padding: 12px 12px 12px 45px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.8);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.luxury-profile .luxury-input input:focus {
+    outline: none;
+    border-color: #a7a39e;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(167, 163, 158, 0.2);
+    transform: translateY(-1px);
+    transition: all 0.15s ease;
+}
+
+.luxury-profile .luxury-input input:focus + i {
+    color: #a7a39e;
+    transform: translateY(-50%) scale(1.05);
+    transition: all 0.15s ease;
+}
+
+.luxury-profile .luxury-input input:disabled {
+    background: rgba(240, 240, 240, 0.8);
+    cursor: not-allowed;
+    color: #777;
+}
+
+.luxury-profile .luxury-btn {
+    background: linear-gradient(135deg, #333 0%, #111 100%);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    margin-top: 10px;
+    animation: buttonFadeIn 1s ease-out;
+}
+
+.luxury-profile .luxury-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: all 0.6s ease;
+}
+
+.luxury-profile .luxury-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #222 0%, #000 100%);
+}
+
+.luxury-profile .luxury-btn:hover::before {
+    left: 100%;
+}
+
+.luxury-profile .error-message {
+    background: rgba(255, 100, 100, 0.1);
+    color: #d32f2f;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #d32f2f;
+    font-weight: 500;
+    animation: none;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .luxury-container {
+        margin: 20px 15px;
+        padding: 20px;
+    }
+    
+    .luxury-profile .header {
+        padding: 12px 15px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .luxury-profile .header h2 {
+        margin-bottom: 10px;
+        font-size: 1.5rem;
+    }
+    
+    .luxury-profile .nav-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        width: 100%;
+    }
+    
+    .luxury-profile .nav-buttons a {
+        font-size: 0.9rem;
+        padding: 8px 12px;
+    }
+    
+    .luxury-container h2 {
+        font-size: 1.6rem;
+    }
+    
+    .luxury-section h3 {
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .luxury-container {
+        padding: 15px;
+    }
+    
+    .luxury-profile .luxury-input input {
+        padding: 10px 10px 10px 35px;
+    }
+    
+    .luxury-profile .input-wrapper i {
+        font-size: 1rem;
+        left: 10px;
+    }
+    
+    .luxury-profile .luxury-btn {
+        width: 100%;
+        padding: 10px;
+    }
+}
+
+/* ==================== ADMIN USERS LUXURY STYLING ==================== */
+.luxury-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin-bottom: 30px;
+    overflow: hidden;
+    transition: all 0.15s ease;
+}
+
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.luxury-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.luxury-card .card-header {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.1) 0%, rgba(140, 133, 125, 0.2) 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem 1.5rem;
+}
+
+.luxury-card .card-header h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    color: #333;
+    letter-spacing: 0.5px;
+}
+
+.luxury-table {
+    margin-bottom: 0;
+}
+
+.luxury-table thead th {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.1) 0%, rgba(140, 133, 125, 0.2) 100%);
+    color: #333;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+    padding: 0.75rem 1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.luxury-table thead th::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(167, 163, 158, 0.5), transparent);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+
+.luxury-table:hover thead th::after {
+    transform: scaleX(1);
+}
+
+.luxury-table tbody tr {
+    transition: all 0.15s ease;
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(1) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(2) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(3) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(4) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(5) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:nth-child(n+6) {
+    animation: none;
+    opacity: 1;
+}
+
+.luxury-table tbody tr:hover {
+    background-color: rgba(167, 163, 158, 0.05);
+    transform: translateX(5px);
+}
+
+.luxury-table tbody td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.badge-admin {
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: white;
+    padding: 0.35rem 0.65rem;
+    border-radius: 4px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.badge-admin:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.badge-user {
+    background: linear-gradient(135deg, #2196F3 0%, #0D47A1 100%);
+    color: white;
+    padding: 0.35rem 0.65rem;
+    border-radius: 4px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.badge-user:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.luxury-select {
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-right: 0.5rem;
+}
+
+.luxury-select:focus {
+    outline: none;
+    border-color: #a7a39e;
+    box-shadow: 0 0 0 3px rgba(167, 163, 158, 0.2);
+    transform: translateY(-2px);
+}
+
+.luxury-btn-sm {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #a7a39e 0%, #8c857d 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+}
+
+.luxury-btn-sm::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: all 0.15s ease;
+}
+
+.luxury-btn-sm:hover {
+    background: linear-gradient(135deg, #8c857d 0%, #6e6a65 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.luxury-btn-sm:hover::before {
+    left: 100% !important;
+}
+
+.luxury-btn-danger {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+}
+
+.luxury-btn-danger::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: all 0.15s ease;
+}
+
+.luxury-btn-danger:hover {
+    background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.luxury-btn-danger:hover::before {
+    left: 100% !important;
+}
+
+/* Add luxury backdrop to admin users page */
+.admin-users-heading + .luxury-card {
+    position: relative;
+    z-index: 1;
+}
+
+/* Indicators styling */
+.indicators {
+    display: flex;
+    justify-content: flex-start;
+    gap: 15px;
+    margin-top: 20px;
+    margin-left: 10px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.indicator {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    color: #555;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.indicator:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
