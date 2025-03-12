@@ -41,8 +41,8 @@
             position: relative;
         }
         
-        .cell-editing-other::after {
-            content: "Redigeras av annan användare";
+        /* Editing tooltip styles */
+        .editing-tooltip {
             position: absolute;
             top: -20px;
             left: 0;
@@ -53,6 +53,12 @@
             font-size: 0.7rem;
             white-space: nowrap;
             z-index: 100;
+            pointer-events: none;
+        }
+        
+        /* Ensure items being edited have proper positioning */
+        .resource-item {
+            position: relative;
         }
     </style>
     <script>
@@ -577,32 +583,52 @@
         function handleEditingStatus(payload) {
             console.log('Editing status update:', payload);
             
-            // If this is our own update, ignore it
-            if (payload.payload.userId === sessionUserId) {
-                return;
-            }
-            
             const { userId, elementId, isEditing } = payload.payload;
             
             // Find the element
             const element = document.getElementById(elementId);
-            if (element) {
+            if (!element) {
+                console.log('Element not found:', elementId);
+                return;
+            }
+
+            // If this is our own update, only update currentlyEditingCell
+            if (userId === sessionUserId) {
                 if (isEditing) {
-                    // Another user is editing this element
-                    element.classList.add('cell-editing-other');
-                    element.setAttribute('contenteditable', 'false'); // Prevent editing
-                    
-                    // Store in our map of elements being edited
-                    cellsBeingEditedByOthers.set(elementId, userId);
+                    currentlyEditingCell = element;
                 } else {
-                    // User stopped editing
-                    element.classList.remove('cell-editing-other');
-                    element.setAttribute('contenteditable', 'true'); // Allow editing again
-                    
-                    // Remove from our map
-                    cellsBeingEditedByOthers.delete(elementId);
+                    currentlyEditingCell = null;
+                }
+                return;
+            }
+
+            // Handle updates from other users
+            if (isEditing) {
+                // Another user is editing this element
+                element.classList.add('cell-editing-other');
+                element.setAttribute('contenteditable', 'false'); // Prevent editing
+                cellsBeingEditedByOthers.set(elementId, userId);
+                
+                // Add tooltip to show who is editing
+                const tooltip = document.createElement('div');
+                tooltip.className = 'editing-tooltip';
+                tooltip.textContent = 'Redigeras av annan användare';
+                element.appendChild(tooltip);
+            } else {
+                // User stopped editing
+                element.classList.remove('cell-editing-other');
+                element.setAttribute('contenteditable', 'true'); // Allow editing again
+                cellsBeingEditedByOthers.delete(elementId);
+                
+                // Remove tooltip
+                const tooltip = element.querySelector('.editing-tooltip');
+                if (tooltip) {
+                    tooltip.remove();
                 }
             }
+
+            // Update the visual state of all items
+            applyEditingIndicators();
         }
         
         // Broadcast editing status
@@ -621,18 +647,32 @@
         
         // Apply editing indicators for elements being edited by others
         function applyEditingIndicators() {
-            // Clear all existing indicators first
+            // First, clear all editing indicators
             document.querySelectorAll('.cell-editing-other').forEach(element => {
-                element.classList.remove('cell-editing-other');
-                element.setAttribute('contenteditable', 'true');
+                if (!cellsBeingEditedByOthers.has(element.id)) {
+                    element.classList.remove('cell-editing-other');
+                    element.setAttribute('contenteditable', 'true');
+                    const tooltip = element.querySelector('.editing-tooltip');
+                    if (tooltip) {
+                        tooltip.remove();
+                    }
+                }
             });
-            
-            // Apply indicators for elements being edited by others
+
+            // Then apply current editing states
             cellsBeingEditedByOthers.forEach((userId, elementId) => {
                 const element = document.getElementById(elementId);
                 if (element) {
                     element.classList.add('cell-editing-other');
-                    element.setAttribute('contenteditable', 'false'); // Prevent editing
+                    element.setAttribute('contenteditable', 'false');
+                    
+                    // Ensure tooltip exists
+                    if (!element.querySelector('.editing-tooltip')) {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'editing-tooltip';
+                        tooltip.textContent = 'Redigeras av annan användare';
+                        element.appendChild(tooltip);
+                    }
                 }
             });
         }
