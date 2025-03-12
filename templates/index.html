@@ -571,7 +571,23 @@
                 'High': '🔴 Hög risk'
             };
             
-            // Find the entity row
+            // First remove any items with the old text
+            const allEntityRows = document.querySelectorAll('.entity-row');
+            allEntityRows.forEach(row => {
+                const riskColumns = row.querySelectorAll('.risk-column');
+                riskColumns.forEach(column => {
+                    const items = column.querySelectorAll('.resource-item');
+                    items.forEach(item => {
+                        const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
+                                       item.textContent.replace('×', '').trim();
+                        if (itemText === oldItem.text) {
+                            item.remove();
+                        }
+                    });
+                });
+            });
+            
+            // Find the entity row for the new item
             const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                 .find(row => row.querySelector('.entity-title').textContent.trim() === newItem.entity);
             
@@ -581,62 +597,35 @@
                     .find(col => col.querySelector('h3').textContent.trim() === riskMap[newItem.risk_level]);
                 
                 if (riskColumn) {
-                    // Try to find an existing item with the same text as the old item
-                    const existingItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    const existingItem = existingItems.find(el => {
-                        const itemText = el.querySelector('.resource-item-text')?.textContent.trim() || 
-                                        el.textContent.replace('×', '').trim();
-                        return itemText === oldItem.text;
-                    });
+                    // Create new item
+                    const newItemElement = document.createElement('div');
+                    newItemElement.className = 'resource-item';
+                    newItemElement.draggable = true;
+                    newItemElement.setAttribute('ondragstart', 'drag(event)');
+                    newItemElement.id = `realtime_${Math.random().toString(36).substr(2, 9)}`;
+                    newItemElement.innerHTML = `
+                        <div class="resource-item-text">${newItem.text}</div>
+                        <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
+                        <button class="remove-btn" onclick="removeItem(this)">×</button>`;
                     
-                    if (existingItem) {
-                        // Update the existing item's text
-                        const textContainer = existingItem.querySelector('.resource-item-text');
-                        if (textContainer) {
-                            textContainer.textContent = newItem.text;
-                            console.log("Updated item text in place:", newItem.text);
-                            return; // Exit early - we've updated the text in place
+                    // Insert at the correct position if specified
+                    if (typeof newItem.position === 'number' && newItem.position >= 0) {
+                        const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
+                        if (newItem.position < allItems.length) {
+                            riskColumn.insertBefore(newItemElement, allItems[newItem.position]);
                         } else {
-                            // If there's no text container, update the whole item
-                            existingItem.innerHTML = `
-                                <div class="resource-item-text">${newItem.text}</div>
-                                <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                                <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-                            
-                            // Add touch event listeners to the updated item
-                            if (typeof addTouchListenersToElement === 'function') {
-                                addTouchListenersToElement(existingItem);
-                            }
-                            console.log("Updated entire item in place:", newItem.text);
-                            return; // Exit early - we've updated the item in place
+                            riskColumn.appendChild(newItemElement);
                         }
+                    } else {
+                        riskColumn.appendChild(newItemElement);
                     }
                     
-                    // If we're here, we couldn't find the item by text, try to find it by position
-                    if (typeof newItem.position === 'number') {
-                        // Get all items in this risk column
-                        const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                        
-                        // Check if there's an item at this position
-                        if (newItem.position >= 0 && newItem.position < allItems.length) {
-                            const itemAtPosition = allItems[newItem.position];
-                            
-                            // Update the item at this position
-                            const textContainer = itemAtPosition.querySelector('.resource-item-text');
-                            if (textContainer) {
-                                textContainer.textContent = newItem.text;
-                                console.log("Updated item at position", newItem.position, ":", newItem.text);
-                                return; // Exit early - we've updated the item at the position
-                            }
-                        }
+                    // Add touch event listeners to the new item
+                    if (typeof addTouchListenersToElement === 'function') {
+                        addTouchListenersToElement(newItemElement);
                     }
                 }
             }
-            
-            // If we couldn't find the item to update, fall back to remove and add
-            console.log("Could not find item to update in place, falling back to remove and add");
-            removeItemFromBoard(oldItem);
-            addItemToBoard(newItem);
         };
         
         // Add item to the board
