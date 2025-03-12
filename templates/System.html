@@ -560,6 +560,9 @@
         const rows = document.querySelectorAll('#system-table-body tr');
         const data = [];
         
+        // Add row index to maintain order
+        let rowIndex = 0;
+        
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
             
@@ -569,10 +572,12 @@
                 system: cells[2].textContent.trim(),
                 leverantor: cells[3].textContent.trim(),
                 status: cells[4].textContent.trim(),
-                omdome: cells[5].textContent.trim()
+                omdome: cells[5].textContent.trim(),
+                row_order: rowIndex // Add row order to maintain position
             };
             
             data.push(rowData);
+            rowIndex++;
         });
         
         return data;
@@ -654,7 +659,7 @@
             const { data, error } = await supabaseClient
                 .from('system_data')
                 .select('*')
-                .order('kategori', { ascending: true });
+                .order('row_order', { ascending: true }); // Order by row_order to maintain original order
             
             if (error) throw error;
             
