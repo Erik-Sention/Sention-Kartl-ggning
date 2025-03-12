@@ -488,45 +488,218 @@
         console.log("Current User ID:", currentUserId);
         console.log("Saved Items count:", savedItems.length);
         
-        // Set up real-time subscription for items
-        const setupRealtimeSubscription = () => {
-            console.log("Setting up real-time subscription for items...");
+        // Track currently edited cell
+        let currentlyEditingCell = null;
+        let isCurrentlySaving = false;
+        
+        // Track cells being edited by other users
+        const cellsBeingEditedByOthers = new Map(); // Map of "rowIndex-colIndex" to user ID
+        
+        // Set up Supabase realtime subscription
+        function setupRealtimeSubscription() {
+            console.log("Setting up realtime subscription...");
             
-            if (!supabaseClient) {
-                console.error("Supabase client not initialized, can't set up subscription");
-                return null;
-            }
-            
-            console.log("Creating channel for category:", currentCategory);
-            
-            // Subscribe to changes in the items table for the current category
-            const subscription = supabaseClient
-                .channel('items-changes')
+            // Subscribe to changes in the items table
+            const itemsChannel = supabaseClient.channel('items-changes')
                 .on('postgres_changes', {
-                    event: '*',  // Listen for all events (INSERT, UPDATE, DELETE)
+                    event: '*',
                     schema: 'public',
-                    table: 'items',
-                    filter: `category=eq.${currentCategory}`
+                    table: 'items'
                 }, (payload) => {
-                    console.log("Real-time event received:", payload);
+                    console.log('Change received!', payload);
                     handleRealtimeChange(payload);
                 })
-                .subscribe((status) => {
-                    console.log("Subscription status:", status);
-                    
-                    if (status === 'SUBSCRIBED') {
-                        console.log("Successfully subscribed to real-time changes!");
-                    } else if (status === 'CHANNEL_ERROR') {
-                        console.error("Error subscribing to real-time changes");
+                .subscribe();
+
+            // Also subscribe to the editing status channel
+            const editingChannel = supabaseClient.channel('editing_status')
+                .on(
+                    'broadcast',
+                    { event: 'editing' },
+                    (payload) => {
+                        handleEditingStatus(payload);
                     }
-                    
-                    // Initialize touch listeners after subscription is set up
-                    setTimeout(addTouchListeners, 500);
-                });
+                )
+                .subscribe();
+            
+            // Set up a heartbeat to keep editing status alive
+            setInterval(() => {
+                if (currentlyEditingCell) {
+                    broadcastEditingStatus(currentlyEditingCell, true);
+                }
+            }, 5000);
+            
+            return [itemsChannel, editingChannel];
+        }
+
+        // Handle editing status updates
+        function handleEditingStatus(payload) {
+            console.log('Editing status update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === currentUserId) {
+                return;
+            }
+            
+            const { userId, itemId, isEditing } = payload.payload;
+            
+            // Find all items with matching text
+            document.querySelectorAll('.resource-item').forEach(item => {
+                const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
+                               item.textContent.replace('×', '').trim();
                 
-            return subscription;
-        };
-        
+                if (itemText === itemId) {
+                    if (isEditing) {
+                        // Another user is editing this item
+                        item.classList.add('cell-editing-other');
+                        item.setAttribute('contenteditable', 'false'); // Prevent editing
+                        item.draggable = false; // Prevent dragging while being edited
+                        
+                        // Add visual indicator of who's editing
+                        let indicator = item.querySelector('.editing-indicator');
+                        if (!indicator) {
+                            indicator = document.createElement('div');
+                            indicator.className = 'editing-indicator';
+                            item.appendChild(indicator);
+                        }
+                        indicator.textContent = `Redigeras av annan användare...`;
+                    } else {
+                        // User stopped editing
+                        item.classList.remove('cell-editing-other');
+                        item.setAttribute('contenteditable', 'true'); // Allow editing again
+                        item.draggable = true; // Re-enable dragging
+                        
+                        // Remove editing indicator
+                        const indicator = item.querySelector('.editing-indicator');
+                        if (indicator) {
+                            indicator.remove();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Broadcast editing status
+        function broadcastEditingStatus(item, isEditing) {
+            const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
+                           item.textContent.replace('×', '').trim();
+            
+            // Broadcast editing status
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'editing',
+                payload: {
+                    userId: currentUserId,
+                    itemId: itemText,
+                    isEditing
+                }
+            });
+        }
+
+        // Update the editItem function to broadcast editing status
+        function editItem(element) {
+            const item = element.closest('.resource-item');
+            
+            // If item is being edited by someone else, don't allow editing
+            if (item.classList.contains('cell-editing-other')) {
+                return;
+            }
+            
+            const textContainer = item.querySelector('.resource-item-text');
+            const currentText = textContainer ? textContainer.textContent.trim() : 
+                              item.textContent.replace('×', '').trim();
+            
+            // Broadcast that we're starting to edit
+            broadcastEditingStatus(item, true);
+            currentlyEditingCell = item;
+            
+            // Add visual editing indicator for this user
+            item.classList.add('cell-editing');
+            
+            // Create an input field for editing
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentText;
+            input.className = 'edit-input';
+            
+            // Create save button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-edit-btn';
+            saveBtn.innerHTML = '<i class="bi bi-check"></i>';
+            saveBtn.onclick = function() {
+                saveItemEdit(input.value, currentText, item);
+                // Broadcast that we're done editing
+                broadcastEditingStatus(item, false);
+                currentlyEditingCell = null;
+            };
+            
+            // Create cancel button
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-edit-btn';
+            cancelBtn.innerHTML = '<i class="bi bi-x"></i>';
+            cancelBtn.onclick = function() {
+                cancelEdit(item, currentText);
+                // Broadcast that we're done editing
+                broadcastEditingStatus(item, false);
+                currentlyEditingCell = null;
+            };
+            
+            // Store the item's data
+            const entityRow = item.closest('.entity-row');
+            const riskColumn = item.closest('.risk-column');
+            item.dataset.entity = entityRow.querySelector('.entity-title').textContent.trim();
+            item.dataset.riskLevel = getRiskLevel(riskColumn.querySelector('h3').textContent.trim());
+            item.dataset.originalText = currentText;
+            
+            // Clear the item and add the input field and buttons
+            item.innerHTML = '';
+            item.appendChild(input);
+            item.appendChild(saveBtn);
+            item.appendChild(cancelBtn);
+            
+            // Focus the input field
+            input.focus();
+            
+            // Disable dragging during edit
+            item.draggable = false;
+        }
+
+        // Add some CSS for editing indicators
+        const style = document.createElement('style');
+        style.textContent = `
+            .cell-editing {
+                background-color: rgba(255, 255, 0, 0.1) !important;
+                box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+            }
+            
+            .cell-editing-other {
+                background-color: rgba(255, 0, 0, 0.1) !important;
+                position: relative;
+            }
+            
+            .editing-indicator {
+                position: absolute;
+                top: -20px;
+                left: 0;
+                background-color: rgba(220, 53, 69, 0.9);
+                color: white;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 0.7rem;
+                white-space: nowrap;
+                z-index: 100;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Helper function to get risk level from text
+        function getRiskLevel(riskText) {
+            if (riskText.includes('Ej risk')) return 'No';
+            if (riskText === '🟡 Risk') return 'At';
+            if (riskText.includes('Hög')) return 'High';
+            return 'Unknown';
+        }
+
         // Handle real-time changes
         const handleRealtimeChange = (payload) => {
             console.log("Real-time change received:", payload);
@@ -554,7 +727,7 @@
                     break;
                     
                 case 'UPDATE':
-                    // Update the item in place instead of removing and re-adding
+                    // Don't ignore own updates - we want to see them in real-time too
                     updateItemInBoard(newItem, oldItem);
                     break;
             }
@@ -580,7 +753,8 @@
                     items.forEach(item => {
                         const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
                                        item.textContent.replace('×', '').trim();
-                        if (itemText === oldItem.text) {
+                        if (itemText === oldItem.text && 
+                            row.querySelector('.entity-title').textContent.trim() === oldItem.entity) {
                             item.remove();
                         }
                     });
