@@ -555,13 +555,48 @@
         }, 5000);
     }
     
+    // Load data from Supabase when page loads
+    async function loadDataFromSupabase(showMessage = true) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('system_data')
+                .select('*');
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                // Clear existing rows except the first one
+                const tableBody = document.getElementById('system-table-body');
+                tableBody.innerHTML = '';
+                
+                // Add rows from Supabase data
+                data.forEach(item => {
+                    const newRow = document.createElement('tr');
+                    newRow.innerHTML = `
+                        <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
+                        <td contenteditable="true" onblur="handleCellChange(this)">${item.kategori || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)">${item.system || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)">${item.leverantor || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)">${item.status || ''}</td>
+                        <td class="rating-cell" onclick="showRatingSelector(this)">${item.omdome || ''}</td>
+                    `;
+                    tableBody.appendChild(newRow);
+                });
+                
+                if (showMessage) {
+                    showStatusMessage('Data laddad från databasen', true);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showStatusMessage('Ett fel uppstod när data skulle laddas: ' + error.message, false);
+        }
+    }
+    
     // Function to collect table data
     function collectTableData() {
         const rows = document.querySelectorAll('#system-table-body tr');
         const data = [];
-        
-        // Add row index to maintain order
-        let rowIndex = 0;
         
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
@@ -572,12 +607,10 @@
                 system: cells[2].textContent.trim(),
                 leverantor: cells[3].textContent.trim(),
                 status: cells[4].textContent.trim(),
-                omdome: cells[5].textContent.trim(),
-                row_order: rowIndex // Add row order to maintain position
+                omdome: cells[5].textContent.trim()
             };
             
             data.push(rowData);
-            rowIndex++;
         });
         
         return data;
@@ -653,43 +686,13 @@
         }
     }
     
-    // Load data from Supabase when page loads
-    async function loadDataFromSupabase(showMessage = true) {
-        try {
-            const { data, error } = await supabaseClient
-                .from('system_data')
-                .select('*')
-                .order('row_order', { ascending: true }); // Order by row_order to maintain original order
-            
-            if (error) throw error;
-            
-            if (data && data.length > 0) {
-                // Clear existing rows except the first one
-                const tableBody = document.getElementById('system-table-body');
-                tableBody.innerHTML = '';
-                
-                // Add rows from Supabase data
-                data.forEach(item => {
-                    const newRow = document.createElement('tr');
-                    newRow.innerHTML = `
-                        <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.kategori || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.system || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.leverantor || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.status || ''}</td>
-                        <td class="rating-cell" onclick="showRatingSelector(this)">${item.omdome || ''}</td>
-                    `;
-                    tableBody.appendChild(newRow);
-                });
-                
-                if (showMessage) {
-                    showStatusMessage('Data laddad från databasen', true);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading data:', error);
-            showStatusMessage('Ett fel uppstod när data skulle laddas: ' + error.message, false);
-        }
+    // Generate UUID for new rows
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
     
     // Load data when page loads
