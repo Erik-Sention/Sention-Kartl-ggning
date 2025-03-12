@@ -441,6 +441,9 @@
     let currentlyEditingCell = null;
     let isCurrentlySaving = false;
     
+    // Track cells being edited by other users
+    const cellsBeingEditedByOthers = new Map(); // Map of "rowIndex-colIndex" to user ID
+    
     // Generate a unique user ID for this session
     const sessionUserId = generateUUID();
     
@@ -483,6 +486,18 @@
             )
             .subscribe();
             
+        // Set up a heartbeat to keep editing status alive
+        setInterval(() => {
+            if (currentlyEditingCell) {
+                // Re-broadcast our editing status every 5 seconds to keep it alive
+                const row = currentlyEditingCell.closest('tr');
+                const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+                const colIndex = Array.from(row.children).indexOf(currentlyEditingCell);
+                
+                broadcastEditingStatus(currentlyEditingCell, true);
+            }
+        }, 5000);
+        
         return [channel, editingChannel];
     }
     
@@ -509,7 +524,8 @@
             return;
         }
         
-        const { rowIndex, colIndex, isEditing } = payload.payload;
+        const { userId, rowIndex, colIndex, isEditing } = payload.payload;
+        const cellKey = `${rowIndex}-${colIndex}`;
         
         // Find the cell
         const rows = document.querySelectorAll('#system-table-body tr');
@@ -522,10 +538,16 @@
                     // Another user is editing this cell
                     cell.classList.add('cell-editing-other');
                     cell.setAttribute('contenteditable', 'false'); // Prevent editing
+                    
+                    // Store in our map of cells being edited
+                    cellsBeingEditedByOthers.set(cellKey, userId);
                 } else {
                     // User stopped editing
                     cell.classList.remove('cell-editing-other');
                     cell.setAttribute('contenteditable', 'true'); // Allow editing again
+                    
+                    // Remove from our map
+                    cellsBeingEditedByOthers.delete(cellKey);
                 }
             }
         }
@@ -547,6 +569,30 @@
                 rowIndex,
                 colIndex,
                 isEditing
+            }
+        });
+    }
+    
+    // Apply editing indicators for cells being edited by others
+    function applyEditingIndicators() {
+        // Clear all existing indicators first
+        document.querySelectorAll('.cell-editing-other').forEach(cell => {
+            cell.classList.remove('cell-editing-other');
+            cell.setAttribute('contenteditable', 'true');
+        });
+        
+        // Apply indicators for cells being edited by others
+        cellsBeingEditedByOthers.forEach((userId, cellKey) => {
+            const [rowIndex, colIndex] = cellKey.split('-').map(Number);
+            
+            const rows = document.querySelectorAll('#system-table-body tr');
+            if (rowIndex >= 0 && rowIndex < rows.length) {
+                const cells = rows[rowIndex].querySelectorAll('td');
+                if (colIndex >= 0 && colIndex < cells.length) {
+                    const cell = cells[colIndex];
+                    cell.classList.add('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'false'); // Prevent editing
+                }
             }
         });
     }
@@ -771,6 +817,9 @@
                 // Restore scroll position
                 window.scrollTo(0, scrollPosition);
                 
+                // Re-apply editing indicators for cells being edited by others
+                applyEditingIndicators();
+                
                 if (showMessage) {
                     showStatusMessage('Data laddad från databasen', true);
                 }
@@ -907,6 +956,12 @@
             // Clean up subscription when page unloads
             window.addEventListener('beforeunload', () => {
                 console.log('Cleaning up subscription...');
+                
+                // Broadcast that we stopped editing any cell
+                if (currentlyEditingCell) {
+                    broadcastEditingStatus(currentlyEditingCell, false);
+                }
+                
                 channels.forEach(channel => {
                     supabaseClient.removeChannel(channel);
                 });
