@@ -333,6 +333,11 @@ def login():
         session['role'] = user_role
         session['logged_in'] = True
         
+        # Store auth tokens in session
+        if hasattr(auth_response, 'session') and auth_response.session:
+            session['access_token'] = auth_response.session.access_token
+            session['refresh_token'] = auth_response.session.refresh_token
+        
         print(f"Session data set: user_id={user_id}, username={user.get('username')}, role={user_role}")
         
         flash('Logged in successfully!')
@@ -467,11 +472,32 @@ def home(category):
     # Update the list of valid categories
     valid_categories = [
         'anstalld', 'grupp', 'organisation', 'foretagsledning', 
-        'managers', 'supervisors'
+        'managers', 'supervisors', 'system'
     ]
     
     if category not in valid_categories:
         return redirect(url_for('home', category='anstalld'))
+    
+    # If category is 'system', render the System.html template
+    if category == 'system':
+        # Get Supabase URL and key for client-side initialization
+        supabase_url = os.environ.get("SUPABASE_URL", "")
+        supabase_key = os.environ.get("SUPABASE_ANON_KEY", "")
+        service_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+        
+        # Get access token if available
+        access_token = None
+        refresh_token = None
+        if 'access_token' in session:
+            access_token = session['access_token']
+            refresh_token = session.get('refresh_token', '')
+        
+        return render_template('System.html', 
+                              supabase_url=supabase_url,
+                              supabase_key=supabase_key,
+                              service_key=service_key,
+                              access_token=access_token,
+                              refresh_token=refresh_token)
     
     try:
         # Get items from Supabase
