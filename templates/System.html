@@ -240,6 +240,35 @@
         white-space: nowrap;
         z-index: 100;
     }
+    
+    /* Drag and drop styles */
+    .drag-handle {
+        cursor: move;
+        color: #6c757d;
+        padding: 5px;
+        margin-right: 5px;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+    }
+    
+    .drag-handle:hover {
+        opacity: 1;
+    }
+    
+    tr.dragging {
+        background-color: #f8f9fa !important;
+        opacity: 0.5;
+        cursor: move;
+    }
+    
+    tr.drag-over {
+        border-top: 2px solid #0d6efd;
+    }
+    
+    .table-enhanced tbody tr td:first-child {
+        display: flex;
+        align-items: center;
+    }
 </style>
 
 <div class="container mt-4" style="margin-top: 150px !important;">
@@ -247,7 +276,7 @@
         <table class="table table-enhanced">
             <thead>
                 <tr>
-                    <th style="width: 40px;"></th>
+                    <th style="width: 80px;"></th>
                     <th>Kategori</th>
                     <th>System</th>
                     <th>Leverantör</th>
@@ -655,8 +684,18 @@
     document.getElementById('add-row-btn').addEventListener('click', function() {
         const tableBody = document.getElementById('system-table-body');
         const newRow = document.createElement('tr');
+        newRow.setAttribute('draggable', 'true');
+        newRow.addEventListener('dragstart', handleDragStart);
+        newRow.addEventListener('dragend', handleDragEnd);
+        newRow.addEventListener('dragover', handleDragOver);
+        newRow.addEventListener('drop', handleDrop);
         newRow.innerHTML = `
-            <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
+            <td>
+                <i class="bi bi-grip-vertical drag-handle"></i>
+                <button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
             <td contenteditable="true" data-placeholder="Kategori" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
             <td contenteditable="true" data-placeholder="System" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
             <td contenteditable="true" data-placeholder="Leverantör" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
@@ -781,8 +820,18 @@
                 // Add rows from Supabase data
                 data.forEach(item => {
                     const newRow = document.createElement('tr');
+                    newRow.setAttribute('draggable', 'true');
+                    newRow.addEventListener('dragstart', handleDragStart);
+                    newRow.addEventListener('dragend', handleDragEnd);
+                    newRow.addEventListener('dragover', handleDragOver);
+                    newRow.addEventListener('drop', handleDrop);
                     newRow.innerHTML = `
-                        <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
+                        <td>
+                            <i class="bi bi-grip-vertical drag-handle"></i>
+                            <button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
                         <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.kategori || ''}</td>
                         <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.system || ''}</td>
                         <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.leverantor || ''}</td>
@@ -791,6 +840,9 @@
                     `;
                     tableBody.appendChild(newRow);
                 });
+                
+                // Initialize drag and drop for the loaded rows
+                initializeDragAndDrop();
                 
                 // Restore focus if we had an active element
                 if (activeElementIndex !== -1) {
@@ -953,6 +1005,9 @@
             // Set up realtime subscription
             const channels = setupRealtimeSubscription();
             
+            // Initialize drag and drop for any existing rows
+            initializeDragAndDrop();
+            
             // Clean up subscription when page unloads
             window.addEventListener('beforeunload', () => {
                 console.log('Cleaning up subscription...');
@@ -974,5 +1029,111 @@
     
     // Make the current_category variable available to the template
     const currentCategory = "system";
+    
+    // Drag and drop functionality
+    let draggedRow = null;
+    
+    function handleDragStart(e) {
+        // Only allow dragging if we're not editing a cell
+        if (currentlyEditingCell) {
+            e.preventDefault();
+            return;
+        }
+        
+        draggedRow = this;
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+    }
+    
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        
+        // Remove drag-over class from all rows
+        const rows = document.querySelectorAll('#system-table-body tr');
+        rows.forEach(row => row.classList.remove('drag-over'));
+        
+        draggedRow = null;
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        
+        // Don't allow dragging if any cell is being edited
+        if (currentlyEditingCell) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (row && row !== draggedRow) {
+            // Remove drag-over class from all rows
+            const rows = document.querySelectorAll('#system-table-body tr');
+            rows.forEach(r => r.classList.remove('drag-over'));
+            
+            // Add drag-over class to the current row
+            row.classList.add('drag-over');
+        }
+        
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        // Don't allow dropping if any cell is being edited
+        if (currentlyEditingCell) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (draggedRow && row && row !== draggedRow) {
+            // Remove drag-over class
+            row.classList.remove('drag-over');
+            
+            // Get the rows in their current order
+            const rows = Array.from(document.querySelectorAll('#system-table-body tr'));
+            const fromIndex = rows.indexOf(draggedRow);
+            const toIndex = rows.indexOf(row);
+            
+            // Move the row
+            if (fromIndex >= 0 && toIndex >= 0) {
+                const parent = row.parentNode;
+                if (toIndex < fromIndex) {
+                    parent.insertBefore(draggedRow, row);
+                } else {
+                    parent.insertBefore(draggedRow, row.nextSibling);
+                }
+                
+                // Trigger auto-save to save the new order
+                triggerAutoSave();
+            }
+        }
+        
+        return false;
+    }
+    
+    // Initialize drag and drop for existing rows
+    function initializeDragAndDrop() {
+        const rows = document.querySelectorAll('#system-table-body tr');
+        rows.forEach(row => {
+            row.setAttribute('draggable', 'true');
+            row.addEventListener('dragstart', handleDragStart);
+            row.addEventListener('dragend', handleDragEnd);
+            row.addEventListener('dragover', handleDragOver);
+            row.addEventListener('drop', handleDrop);
+            
+            // Add drag handle to first cell if it doesn't exist
+            const firstCell = row.querySelector('td:first-child');
+            if (firstCell && !firstCell.querySelector('.drag-handle')) {
+                const dragHandle = document.createElement('i');
+                dragHandle.className = 'bi bi-grip-vertical drag-handle';
+                firstCell.insertBefore(dragHandle, firstCell.firstChild);
+            }
+        });
+    }
 </script>
 {% endblock %} 
