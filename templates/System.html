@@ -396,6 +396,42 @@
     // Current cell being rated
     let currentRatingCell = null;
     
+    // Set up Supabase realtime subscription
+    function setupRealtimeSubscription() {
+        console.log("Setting up realtime subscription...");
+        
+        // Subscribe to changes in the system_data table
+        const channel = supabaseClient.channel('system_data_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'system_data'
+                },
+                (payload) => {
+                    console.log('Change received!', payload);
+                    handleRealtimeChange(payload);
+                }
+            )
+            .subscribe((status) => {
+                console.log('Subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('Successfully subscribed to realtime changes!');
+                }
+            });
+            
+        return channel;
+    }
+    
+    // Handle realtime changes
+    function handleRealtimeChange(payload) {
+        console.log('Handling realtime change:', payload);
+        
+        // Reload data from Supabase
+        loadDataFromSupabase(false); // Pass false to not show the status message
+    }
+    
     // Function to show rating selector
     function showRatingSelector(cell) {
         // Store reference to current cell
@@ -604,7 +640,7 @@
     }
     
     // Load data from Supabase when page loads
-    async function loadDataFromSupabase() {
+    async function loadDataFromSupabase(showMessage = true) {
         try {
             const { data, error } = await supabaseClient
                 .from('system_data')
@@ -632,7 +668,9 @@
                     tableBody.appendChild(newRow);
                 });
                 
-                showStatusMessage('Data laddad från databasen', true);
+                if (showMessage) {
+                    showStatusMessage('Data laddad från databasen', true);
+                }
             }
         } catch (error) {
             console.error('Error loading data:', error);
@@ -646,7 +684,17 @@
         console.log("Supabase Key:", supabaseKey ? "Key exists" : "Key missing");
         
         if (supabaseUrl && supabaseKey) {
+            // Load initial data
             loadDataFromSupabase();
+            
+            // Set up realtime subscription
+            const channel = setupRealtimeSubscription();
+            
+            // Clean up subscription when page unloads
+            window.addEventListener('beforeunload', () => {
+                console.log('Cleaning up subscription...');
+                supabaseClient.removeChannel(channel);
+            });
         } else {
             console.error('Supabase configuration is missing');
             showStatusMessage('Kunde inte ansluta till databasen: Konfiguration saknas', false);
