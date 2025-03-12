@@ -557,24 +557,22 @@
                 return null;
             }
 
-            // Create a shared channel for all users
-            const channel = supabaseClient.channel('shared-editing-status');
-
-            channel
-                .on('broadcast', { event: 'editing-status' }, (payload) => {
-                    console.log('Received editing status:', payload);
-                    handleEditingStatus(payload);
-                })
-                .subscribe((status) => {
-                    console.log("Editing status subscription status:", status);
-                    if (status === 'SUBSCRIBED') {
-                        console.log("Successfully subscribed to editing status updates!");
+            // Create editing status channel
+            const editingChannel = supabaseClient.channel('editing_status')
+                .on(
+                    'broadcast',
+                    { event: 'editing' },
+                    (payload) => {
+                        handleEditingStatus(payload);
                     }
-                });
-            
+                )
+                .subscribe();
+
             // Set up a heartbeat to keep editing status alive
             const heartbeatInterval = setInterval(() => {
                 if (currentlyEditingCell) {
+                    // Re-broadcast our editing status every 5 seconds to keep it alive
+                    const row = currentlyEditingCell.closest('.resource-item');
                     broadcastEditingStatus(currentlyEditingCell, true);
                 }
             }, 5000);
@@ -585,10 +583,10 @@
                 if (currentlyEditingCell) {
                     broadcastEditingStatus(currentlyEditingCell, false);
                 }
-                channel.unsubscribe();
+                editingChannel.unsubscribe();
             });
             
-            return channel;
+            return editingChannel;
         }
 
         // Broadcast editing status
@@ -598,32 +596,31 @@
                 return;
             }
 
-            const payload = {
-                userId: sessionUserId,
-                elementId: element.id,
-                isEditing,
-                timestamp: Date.now()
-            };
-
-            console.log('Broadcasting editing status:', payload);
-
-            // Send to the shared channel
-            supabaseClient.channel('shared-editing-status').send({
+            // Find row and column index
+            const elementId = element.id;
+            
+            // Broadcast editing status
+            supabaseClient.channel('editing_status').send({
                 type: 'broadcast',
-                event: 'editing-status',
-                payload: payload
-            }).then(() => {
-                console.log('Successfully broadcasted editing status');
-            }).catch((error) => {
-                console.error('Error broadcasting editing status:', error);
+                event: 'editing',
+                payload: {
+                    userId: sessionUserId,
+                    elementId: elementId,
+                    isEditing
+                }
             });
         }
 
         // Handle editing status updates
         function handleEditingStatus(payload) {
-            console.log('Editing status update received:', payload);
+            console.log('Editing status update:', payload);
             
-            const { userId, elementId, isEditing, timestamp } = payload.payload;
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { userId, elementId, isEditing } = payload.payload;
             
             // Find the element
             const element = document.getElementById(elementId);
@@ -631,83 +628,37 @@
                 console.log('Element not found:', elementId);
                 return;
             }
-
-            // Handle updates from other users
-            if (userId !== sessionUserId) {
-                if (isEditing) {
-                    // Another user is editing this element
-                    element.classList.add('cell-editing-other');
-                    element.setAttribute('contenteditable', 'false'); // Prevent editing
-                    cellsBeingEditedByOthers.set(elementId, userId);
-                    
-                    // Add tooltip to show who is editing
-                    let tooltip = element.querySelector('.editing-tooltip');
-                    if (!tooltip) {
-                        tooltip = document.createElement('div');
-                        tooltip.className = 'editing-tooltip';
-                        element.appendChild(tooltip);
-                    }
+            
+            if (isEditing) {
+                // Another user is editing this element
+                element.classList.add('cell-editing-other');
+                element.setAttribute('contenteditable', 'false'); // Prevent editing
+                
+                // Store in our map of cells being edited
+                cellsBeingEditedByOthers.set(elementId, userId);
+                
+                // Add tooltip to show who is editing
+                let tooltip = element.querySelector('.editing-tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'editing-tooltip';
                     tooltip.textContent = 'Redigeras av annan användare';
-                } else {
-                    // User stopped editing
-                    element.classList.remove('cell-editing-other');
-                    element.setAttribute('contenteditable', 'true'); // Allow editing again
-                    cellsBeingEditedByOthers.delete(elementId);
-                    
-                    // Remove tooltip
-                    const tooltip = element.querySelector('.editing-tooltip');
-                    if (tooltip) {
-                        tooltip.remove();
-                    }
+                    element.appendChild(tooltip);
                 }
             } else {
-                // Handle our own updates
-                if (isEditing) {
-                    currentlyEditingCell = element;
-                    element.classList.add('cell-editing');
-                } else {
-                    if (currentlyEditingCell === element) {
-                        currentlyEditingCell = null;
-                    }
-                    element.classList.remove('cell-editing');
+                // User stopped editing
+                element.classList.remove('cell-editing-other');
+                element.setAttribute('contenteditable', 'true'); // Allow editing again
+                
+                // Remove from our map
+                cellsBeingEditedByOthers.delete(elementId);
+                
+                // Remove tooltip
+                const tooltip = element.querySelector('.editing-tooltip');
+                if (tooltip) {
+                    tooltip.remove();
                 }
             }
-
-            // Update the visual state of all items
-            applyEditingIndicators();
-        }
-
-        // Apply editing indicators for elements being edited by others
-        function applyEditingIndicators() {
-            // First, clear all editing indicators
-            document.querySelectorAll('.cell-editing-other').forEach(element => {
-                if (!cellsBeingEditedByOthers.has(element.id)) {
-                    element.classList.remove('cell-editing-other');
-                    element.setAttribute('contenteditable', 'true');
-                    const tooltip = element.querySelector('.editing-tooltip');
-                    if (tooltip) {
-                        tooltip.remove();
-                    }
-                }
-            });
-
-            // Then apply current editing states
-            cellsBeingEditedByOthers.forEach((userId, elementId) => {
-                const element = document.getElementById(elementId);
-                if (element) {
-                    element.classList.add('cell-editing-other');
-                    element.setAttribute('contenteditable', 'false');
-                    
-                    // Ensure tooltip exists
-                    let tooltip = element.querySelector('.editing-tooltip');
-                    if (!tooltip) {
-                        tooltip = document.createElement('div');
-                        tooltip.className = 'editing-tooltip';
-                        tooltip.textContent = 'Redigeras av annan användare';
-                        element.appendChild(tooltip);
-                    }
-                }
-            });
         }
 
         // Function to generate UUID for elements
@@ -1314,7 +1265,6 @@
             const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
             
             // Store the item's position in the DOM for later use
-            // We need to filter to only count resource-item elements
             const itemPosition = allItems.indexOf(item);
             console.log("Editing item at position:", itemPosition);
             
