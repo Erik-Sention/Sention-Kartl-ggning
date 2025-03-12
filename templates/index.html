@@ -11,56 +11,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        /* ... existing code ... */
-        
-        /* Cell being edited styles */
-        .cell-editing {
-            background-color: rgba(255, 255, 0, 0.1) !important;
-            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
-            position: relative;
-        }
-        
-        .cell-editing::after {
-            content: "Redigeras...";
-            position: absolute;
-            top: -20px;
-            left: 0;
-            background-color: rgba(0, 123, 255, 0.9);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.7rem;
-            white-space: nowrap;
-            z-index: 100;
-        }
-        
-        /* Cell being edited by another user */
-        .cell-editing-other {
-            background-color: rgba(255, 0, 0, 0.1) !important;
-            position: relative;
-        }
-        
-        /* Editing tooltip styles */
-        .editing-tooltip {
-            position: absolute;
-            top: -20px;
-            left: 0;
-            background-color: rgba(220, 53, 69, 0.9);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.7rem;
-            white-space: nowrap;
-            z-index: 100;
-            pointer-events: none;
-        }
-        
-        /* Ensure items being edited have proper positioning */
-        .resource-item {
-            position: relative;
-        }
-    </style>
     <script>
         function allowDrop(ev) {
             ev.preventDefault();
@@ -538,138 +488,6 @@
         console.log("Current User ID:", currentUserId);
         console.log("Saved Items count:", savedItems.length);
         
-        // Track currently edited cell
-        let currentlyEditingCell = null;
-        let isCurrentlySaving = false;
-        
-        // Track cells being edited by other users
-        const cellsBeingEditedByOthers = new Map(); // Map of "rowIndex-colIndex" to user ID
-        
-        // Generate a unique user ID for this session
-        const sessionUserId = generateUUID();
-        
-        // Set up real-time subscription for editing status
-        function setupEditingSubscription() {
-            console.log("Setting up editing status subscription...");
-            
-            if (!supabaseClient) {
-                console.error("Supabase client not initialized, can't set up subscription");
-                return null;
-            }
-
-            // Create editing status channel
-            const editingChannel = supabaseClient.channel('editing_status')
-                .on(
-                    'broadcast',
-                    { event: 'editing' },
-                    (payload) => {
-                        handleEditingStatus(payload);
-                    }
-                )
-                .subscribe();
-
-            // Set up a heartbeat to keep editing status alive
-            const heartbeatInterval = setInterval(() => {
-                if (currentlyEditingCell) {
-                    // Re-broadcast our editing status every 5 seconds to keep it alive
-                    const row = currentlyEditingCell.closest('.resource-item');
-                    broadcastEditingStatus(currentlyEditingCell, true);
-                }
-            }, 5000);
-
-            // Clean up on page unload
-            window.addEventListener('beforeunload', () => {
-                clearInterval(heartbeatInterval);
-                if (currentlyEditingCell) {
-                    broadcastEditingStatus(currentlyEditingCell, false);
-                }
-                editingChannel.unsubscribe();
-            });
-            
-            return editingChannel;
-        }
-
-        // Broadcast editing status
-        function broadcastEditingStatus(element, isEditing) {
-            if (!supabaseClient) {
-                console.error("Supabase client not initialized, can't broadcast editing status");
-                return;
-            }
-
-            // Find row and column index
-            const elementId = element.id;
-            
-            // Broadcast editing status
-            supabaseClient.channel('editing_status').send({
-                type: 'broadcast',
-                event: 'editing',
-                payload: {
-                    userId: sessionUserId,
-                    elementId: elementId,
-                    isEditing
-                }
-            });
-        }
-
-        // Handle editing status updates
-        function handleEditingStatus(payload) {
-            console.log('Editing status update:', payload);
-            
-            // If this is our own update, ignore it
-            if (payload.payload.userId === sessionUserId) {
-                return;
-            }
-            
-            const { userId, elementId, isEditing } = payload.payload;
-            
-            // Find the element
-            const element = document.getElementById(elementId);
-            if (!element) {
-                console.log('Element not found:', elementId);
-                return;
-            }
-            
-            if (isEditing) {
-                // Another user is editing this element
-                element.classList.add('cell-editing-other');
-                element.setAttribute('contenteditable', 'false'); // Prevent editing
-                
-                // Store in our map of cells being edited
-                cellsBeingEditedByOthers.set(elementId, userId);
-                
-                // Add tooltip to show who is editing
-                let tooltip = element.querySelector('.editing-tooltip');
-                if (!tooltip) {
-                    tooltip = document.createElement('div');
-                    tooltip.className = 'editing-tooltip';
-                    tooltip.textContent = 'Redigeras av annan användare';
-                    element.appendChild(tooltip);
-                }
-            } else {
-                // User stopped editing
-                element.classList.remove('cell-editing-other');
-                element.setAttribute('contenteditable', 'true'); // Allow editing again
-                
-                // Remove from our map
-                cellsBeingEditedByOthers.delete(elementId);
-                
-                // Remove tooltip
-                const tooltip = element.querySelector('.editing-tooltip');
-                if (tooltip) {
-                    tooltip.remove();
-                }
-            }
-        }
-
-        // Function to generate UUID for elements
-        function generateUUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
-        
         // Set up real-time subscription for items
         const setupRealtimeSubscription = () => {
             console.log("Setting up real-time subscription for items...");
@@ -1128,9 +946,6 @@
             // Set up real-time subscription for items
             const itemsSubscription = setupRealtimeSubscription();
             
-            // Set up real-time subscription for editing status
-            const editingSubscription = setupEditingSubscription();
-            
             // Load resources
             loadResources();
             
@@ -1140,14 +955,7 @@
             // Clean up subscriptions when page unloads
             window.addEventListener('beforeunload', () => {
                 console.log('Cleaning up subscriptions...');
-                
-                // Broadcast that we stopped editing any item
-                if (currentlyEditingCell) {
-                    broadcastEditingStatus(currentlyEditingCell, false);
-                }
-                
                 if (itemsSubscription) itemsSubscription.unsubscribe();
-                if (editingSubscription) editingSubscription.unsubscribe();
                 if (resourcesSubscription) resourcesSubscription.unsubscribe();
             });
         });
@@ -1226,25 +1034,6 @@
         
         function editItem(element) {
             const item = element.closest('.resource-item');
-            
-            // If item is being edited by another user, don't allow editing
-            if (item.classList.contains('cell-editing-other')) {
-                return;
-            }
-            
-            // Ensure the item has an ID
-            if (!item.id) {
-                item.id = 'item_' + generateUUID();
-            }
-            
-            // Mark as being edited
-            currentlyEditingCell = item;
-            item.classList.add('cell-editing');
-            
-            // Broadcast editing status
-            broadcastEditingStatus(item, true);
-            
-            // Rest of the existing editItem code...
             const textContainer = item.querySelector('.resource-item-text');
             const currentText = textContainer ? textContainer.textContent.trim() : item.textContent.replace('×', '').trim();
             
@@ -1265,6 +1054,7 @@
             const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
             
             // Store the item's position in the DOM for later use
+            // We need to filter to only count resource-item elements
             const itemPosition = allItems.indexOf(item);
             console.log("Editing item at position:", itemPosition);
             
@@ -1378,20 +1168,7 @@
         }
         
         function cancelEdit(item, originalText) {
-            // Broadcast that we stopped editing
-            if (item.id) {
-                broadcastEditingStatus(item, false);
-            }
-            
-            // Clear currently editing cell if it's this one
-            if (currentlyEditingCell === item) {
-                currentlyEditingCell = null;
-            }
-            
-            // Remove editing indicator
-            item.classList.remove('cell-editing');
-            
-            // Rest of the existing cancelEdit code...
+            // For resources
             if (item.id.startsWith('resource_')) {
                 const resourceId = item.id.replace('resource_', '');
                 item.innerHTML = `
@@ -1399,7 +1176,9 @@
                     <button class="edit-btn" onclick="editResourceItem(this, '${resourceId}')"><i class="bi bi-pencil"></i></button>
                     <button class="remove-btn" onclick="removeResourceItem(this, '${resourceId}')">×</button>
                 `;
-            } else {
+            } 
+            // For board items
+            else {
                 item.innerHTML = `
                     <div class="resource-item-text">${originalText}</div>
                     <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
