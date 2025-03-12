@@ -256,13 +256,34 @@
     }
     
     tr.dragging {
-        background-color: #f8f9fa !important;
-        opacity: 0.5;
+        background-color: rgba(0, 123, 255, 0.1) !important;
+        opacity: 0.8;
         cursor: move;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
     
     tr.drag-over {
-        border-top: 2px solid #0d6efd;
+        position: relative;
+    }
+    
+    tr.drag-over::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -2px;
+        height: 4px;
+        background-color: #0d6efd;
+        z-index: 100;
+        border-radius: 2px;
+        box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
     }
     
     .table-enhanced tbody tr td:first-child {
@@ -1072,8 +1093,24 @@
             const rows = document.querySelectorAll('#system-table-body tr');
             rows.forEach(r => r.classList.remove('drag-over'));
             
-            // Add drag-over class to the current row
-            row.classList.add('drag-over');
+            // Get mouse position relative to the row
+            const rect = row.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const threshold = rect.top + (rect.height / 2);
+            
+            // Add drag-over class to the appropriate row
+            if (mouseY < threshold) {
+                row.classList.add('drag-over');
+            } else {
+                // If mouse is in bottom half, add class to next row if it exists
+                const nextRow = row.nextElementSibling;
+                if (nextRow) {
+                    nextRow.classList.add('drag-over');
+                } else {
+                    // If there's no next row, add class to current row
+                    row.classList.add('drag-over');
+                }
+            }
         }
         
         return false;
@@ -1091,26 +1128,23 @@
         
         const row = e.target.closest('tr');
         if (draggedRow && row && row !== draggedRow) {
+            // Get mouse position relative to the row
+            const rect = row.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const threshold = rect.top + (rect.height / 2);
+            
             // Remove drag-over class
             row.classList.remove('drag-over');
             
-            // Get the rows in their current order
-            const rows = Array.from(document.querySelectorAll('#system-table-body tr'));
-            const fromIndex = rows.indexOf(draggedRow);
-            const toIndex = rows.indexOf(row);
-            
-            // Move the row
-            if (fromIndex >= 0 && toIndex >= 0) {
-                const parent = row.parentNode;
-                if (toIndex < fromIndex) {
-                    parent.insertBefore(draggedRow, row);
-                } else {
-                    parent.insertBefore(draggedRow, row.nextSibling);
-                }
-                
-                // Trigger auto-save to save the new order
-                triggerAutoSave();
+            // Insert the row based on mouse position
+            if (mouseY < threshold) {
+                row.parentNode.insertBefore(draggedRow, row);
+            } else {
+                row.parentNode.insertBefore(draggedRow, row.nextSibling);
             }
+            
+            // Trigger auto-save to save the new order
+            triggerAutoSave();
         }
         
         return false;
