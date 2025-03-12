@@ -500,6 +500,15 @@
         `;
         tableBody.appendChild(newRow);
         
+        // Scroll to the new row to make it visible
+        newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Focus on the first editable cell of the new row
+        const firstEditableCell = newRow.querySelector('[contenteditable="true"]');
+        if (firstEditableCell) {
+            firstEditableCell.focus();
+        }
+        
         // Trigger auto-save
         triggerAutoSave();
     });
