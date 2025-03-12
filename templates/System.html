@@ -199,6 +199,47 @@
         z-index: 100;
         margin-bottom: 5px;
     }
+    
+    /* Cell being edited styles */
+    .cell-editing {
+        background-color: rgba(255, 255, 0, 0.1) !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+        position: relative;
+    }
+    
+    .cell-editing::after {
+        content: "Redigeras...";
+        position: absolute;
+        top: -20px;
+        left: 0;
+        background-color: rgba(0, 123, 255, 0.9);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        z-index: 100;
+    }
+    
+    /* Cell being edited by another user */
+    .cell-editing-other {
+        background-color: rgba(255, 0, 0, 0.1) !important;
+        position: relative;
+    }
+    
+    .cell-editing-other::after {
+        content: "Redigeras av annan användare";
+        position: absolute;
+        top: -20px;
+        left: 0;
+        background-color: rgba(220, 53, 69, 0.9);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        z-index: 100;
+    }
 </style>
 
 <div class="container mt-4" style="margin-top: 150px !important;">
@@ -396,6 +437,13 @@
     // Current cell being rated
     let currentRatingCell = null;
     
+    // Track currently edited cell
+    let currentlyEditingCell = null;
+    let isCurrentlySaving = false;
+    
+    // Generate a unique user ID for this session
+    const sessionUserId = generateUUID();
+    
     // Set up Supabase realtime subscription
     function setupRealtimeSubscription() {
         console.log("Setting up realtime subscription...");
@@ -411,7 +459,10 @@
                 },
                 (payload) => {
                     console.log('Change received!', payload);
-                    handleRealtimeChange(payload);
+                    // Only reload if we're not currently saving
+                    if (!isCurrentlySaving) {
+                        handleRealtimeChange(payload);
+                    }
                 }
             )
             .subscribe((status) => {
@@ -421,15 +472,83 @@
                 }
             });
             
-        return channel;
+        // Also subscribe to the editing status channel
+        const editingChannel = supabaseClient.channel('editing_status')
+            .on(
+                'broadcast',
+                { event: 'editing' },
+                (payload) => {
+                    handleEditingStatus(payload);
+                }
+            )
+            .subscribe();
+            
+        return [channel, editingChannel];
     }
     
     // Handle realtime changes
     function handleRealtimeChange(payload) {
         console.log('Handling realtime change:', payload);
         
+        // Don't reload if we're currently editing a cell
+        if (currentlyEditingCell) {
+            console.log('Not reloading because user is editing a cell');
+            return;
+        }
+        
         // Reload data from Supabase
         loadDataFromSupabase(false); // Pass false to not show the status message
+    }
+    
+    // Handle editing status updates
+    function handleEditingStatus(payload) {
+        console.log('Editing status update:', payload);
+        
+        // If this is our own update, ignore it
+        if (payload.payload.userId === sessionUserId) {
+            return;
+        }
+        
+        const { rowIndex, colIndex, isEditing } = payload.payload;
+        
+        // Find the cell
+        const rows = document.querySelectorAll('#system-table-body tr');
+        if (rowIndex >= 0 && rowIndex < rows.length) {
+            const cells = rows[rowIndex].querySelectorAll('td');
+            if (colIndex >= 0 && colIndex < cells.length) {
+                const cell = cells[colIndex];
+                
+                if (isEditing) {
+                    // Another user is editing this cell
+                    cell.classList.add('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'false'); // Prevent editing
+                } else {
+                    // User stopped editing
+                    cell.classList.remove('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'true'); // Allow editing again
+                }
+            }
+        }
+    }
+    
+    // Broadcast editing status
+    function broadcastEditingStatus(cell, isEditing) {
+        // Find row and column index
+        const row = cell.closest('tr');
+        const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+        const colIndex = Array.from(row.children).indexOf(cell);
+        
+        // Broadcast editing status
+        supabaseClient.channel('editing_status').send({
+            type: 'broadcast',
+            event: 'editing',
+            payload: {
+                userId: sessionUserId,
+                rowIndex,
+                colIndex,
+                isEditing
+            }
+        });
     }
     
     // Function to show rating selector
@@ -492,10 +611,10 @@
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
             <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
-            <td contenteditable="true" data-placeholder="Kategori" onblur="handleCellChange(this)"></td>
-            <td contenteditable="true" data-placeholder="System" onblur="handleCellChange(this)"></td>
-            <td contenteditable="true" data-placeholder="Leverantör" onblur="handleCellChange(this)"></td>
-            <td contenteditable="true" data-placeholder="Status" onblur="handleCellChange(this)"></td>
+            <td contenteditable="true" data-placeholder="Kategori" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="System" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="Leverantör" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="Status" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
             <td class="rating-cell" onclick="showRatingSelector(this)"></td>
         `;
         tableBody.appendChild(newRow);
@@ -513,8 +632,29 @@
         triggerAutoSave();
     });
     
+    // Function to handle cell focus
+    function handleCellFocus(cell) {
+        // Mark this cell as being edited
+        currentlyEditingCell = cell;
+        cell.classList.add('cell-editing');
+        
+        // Broadcast editing status
+        broadcastEditingStatus(cell, true);
+    }
+    
     // Function to handle cell changes
     function handleCellChange(cell) {
+        // Remove editing indicator
+        cell.classList.remove('cell-editing');
+        
+        // Broadcast that we stopped editing
+        broadcastEditingStatus(cell, false);
+        
+        // Clear currently editing cell if it's this one
+        if (currentlyEditingCell === cell) {
+            currentlyEditingCell = null;
+        }
+        
         // Trigger auto-save
         triggerAutoSave();
     }
@@ -567,6 +707,29 @@
             if (data && data.length > 0) {
                 // Clear existing rows except the first one
                 const tableBody = document.getElementById('system-table-body');
+                
+                // Save the current focus position if any
+                let activeElementIndex = -1;
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.getAttribute('contenteditable') === 'true') {
+                    const activeRow = activeElement.closest('tr');
+                    const activeCell = activeElement;
+                    if (activeRow && activeCell) {
+                        const rowIndex = Array.from(tableBody.children).indexOf(activeRow);
+                        const cellIndex = Array.from(activeRow.children).indexOf(activeCell);
+                        activeElementIndex = { rowIndex, cellIndex };
+                        
+                        // Don't reload if we're editing a cell
+                        if (currentlyEditingCell) {
+                            console.log('Not reloading because user is editing a cell');
+                            return;
+                        }
+                    }
+                }
+                
+                // Store current scroll position
+                const scrollPosition = window.scrollY;
+                
                 tableBody.innerHTML = '';
                 
                 // Add rows from Supabase data
@@ -574,14 +737,39 @@
                     const newRow = document.createElement('tr');
                     newRow.innerHTML = `
                         <td><button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)"><i class="bi bi-trash"></i></button></td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.kategori || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.system || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.leverantor || ''}</td>
-                        <td contenteditable="true" onblur="handleCellChange(this)">${item.status || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.kategori || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.system || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.leverantor || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.status || ''}</td>
                         <td class="rating-cell" onclick="showRatingSelector(this)">${item.omdome || ''}</td>
                     `;
                     tableBody.appendChild(newRow);
                 });
+                
+                // Restore focus if we had an active element
+                if (activeElementIndex !== -1) {
+                    const rows = tableBody.querySelectorAll('tr');
+                    if (activeElementIndex.rowIndex < rows.length) {
+                        const cells = rows[activeElementIndex.rowIndex].querySelectorAll('td');
+                        if (activeElementIndex.cellIndex < cells.length) {
+                            cells[activeElementIndex.cellIndex].focus();
+                            
+                            // Place cursor at the end of the text
+                            const range = document.createRange();
+                            const sel = window.getSelection();
+                            const textNode = cells[activeElementIndex.cellIndex].childNodes[0];
+                            if (textNode) {
+                                range.setStart(textNode, textNode.length);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        }
+                    }
+                }
+                
+                // Restore scroll position
+                window.scrollTo(0, scrollPosition);
                 
                 if (showMessage) {
                     showStatusMessage('Data laddad från databasen', true);
@@ -619,6 +807,9 @@
     // Function to save data to Supabase
     async function saveDataToSupabase(event) {
         try {
+            // Set flag that we're saving
+            isCurrentlySaving = true;
+            
             const tableData = collectTableData();
             
             // Check if user is authenticated
@@ -675,6 +866,9 @@
                 autoSaveIndicator.innerHTML = '';
             }, 2000);
             
+            // Reset saving flag
+            isCurrentlySaving = false;
+            
         } catch (error) {
             console.error('Error saving data:', error);
             
@@ -683,6 +877,9 @@
             
             // Show error message
             showStatusMessage('Ett fel uppstod när data skulle sparas: ' + error.message, false);
+            
+            // Reset saving flag
+            isCurrentlySaving = false;
         }
     }
     
@@ -705,12 +902,14 @@
             loadDataFromSupabase();
             
             // Set up realtime subscription
-            const channel = setupRealtimeSubscription();
+            const channels = setupRealtimeSubscription();
             
             // Clean up subscription when page unloads
             window.addEventListener('beforeunload', () => {
                 console.log('Cleaning up subscription...');
-                supabaseClient.removeChannel(channel);
+                channels.forEach(channel => {
+                    supabaseClient.removeChannel(channel);
+                });
             });
         } else {
             console.error('Supabase configuration is missing');
