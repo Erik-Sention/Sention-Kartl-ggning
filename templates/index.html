@@ -556,16 +556,12 @@
                 console.error("Supabase client not initialized, can't set up subscription");
                 return null;
             }
-            
-            // Subscribe to the editing status channel
-            const channel = supabaseClient.channel('editing-status', {
-                config: {
-                    broadcast: { self: true }
-                }
-            });
+
+            // Create a shared channel for all users
+            const channel = supabaseClient.channel('shared-editing-status');
 
             channel
-                .on('broadcast', { event: 'editing' }, (payload) => {
+                .on('broadcast', { event: 'editing-status' }, (payload) => {
                     console.log('Received editing status:', payload);
                     handleEditingStatus(payload);
                 })
@@ -602,21 +598,24 @@
                 return;
             }
 
-            console.log('Broadcasting editing status:', {
+            const payload = {
                 userId: sessionUserId,
                 elementId: element.id,
-                isEditing
-            });
+                isEditing,
+                timestamp: Date.now()
+            };
 
-            supabaseClient.channel('editing-status').send({
+            console.log('Broadcasting editing status:', payload);
+
+            // Send to the shared channel
+            supabaseClient.channel('shared-editing-status').send({
                 type: 'broadcast',
-                event: 'editing',
-                payload: {
-                    userId: sessionUserId,
-                    elementId: element.id,
-                    isEditing,
-                    timestamp: Date.now()
-                }
+                event: 'editing-status',
+                payload: payload
+            }).then(() => {
+                console.log('Successfully broadcasted editing status');
+            }).catch((error) => {
+                console.error('Error broadcasting editing status:', error);
             });
         }
 
@@ -633,8 +632,36 @@
                 return;
             }
 
-            // If this is our own update, only update currentlyEditingCell
-            if (userId === sessionUserId) {
+            // Handle updates from other users
+            if (userId !== sessionUserId) {
+                if (isEditing) {
+                    // Another user is editing this element
+                    element.classList.add('cell-editing-other');
+                    element.setAttribute('contenteditable', 'false'); // Prevent editing
+                    cellsBeingEditedByOthers.set(elementId, userId);
+                    
+                    // Add tooltip to show who is editing
+                    let tooltip = element.querySelector('.editing-tooltip');
+                    if (!tooltip) {
+                        tooltip = document.createElement('div');
+                        tooltip.className = 'editing-tooltip';
+                        element.appendChild(tooltip);
+                    }
+                    tooltip.textContent = 'Redigeras av annan användare';
+                } else {
+                    // User stopped editing
+                    element.classList.remove('cell-editing-other');
+                    element.setAttribute('contenteditable', 'true'); // Allow editing again
+                    cellsBeingEditedByOthers.delete(elementId);
+                    
+                    // Remove tooltip
+                    const tooltip = element.querySelector('.editing-tooltip');
+                    if (tooltip) {
+                        tooltip.remove();
+                    }
+                }
+            } else {
+                // Handle our own updates
                 if (isEditing) {
                     currentlyEditingCell = element;
                     element.classList.add('cell-editing');
@@ -643,35 +670,6 @@
                         currentlyEditingCell = null;
                     }
                     element.classList.remove('cell-editing');
-                }
-                return;
-            }
-
-            // Handle updates from other users
-            if (isEditing) {
-                // Another user is editing this element
-                element.classList.add('cell-editing-other');
-                element.setAttribute('contenteditable', 'false'); // Prevent editing
-                cellsBeingEditedByOthers.set(elementId, userId);
-                
-                // Add tooltip to show who is editing
-                let tooltip = element.querySelector('.editing-tooltip');
-                if (!tooltip) {
-                    tooltip = document.createElement('div');
-                    tooltip.className = 'editing-tooltip';
-                    element.appendChild(tooltip);
-                }
-                tooltip.textContent = 'Redigeras av annan användare';
-            } else {
-                // User stopped editing
-                element.classList.remove('cell-editing-other');
-                element.setAttribute('contenteditable', 'true'); // Allow editing again
-                cellsBeingEditedByOthers.delete(elementId);
-                
-                // Remove tooltip
-                const tooltip = element.querySelector('.editing-tooltip');
-                if (tooltip) {
-                    tooltip.remove();
                 }
             }
 
