@@ -488,306 +488,45 @@
         console.log("Current User ID:", currentUserId);
         console.log("Saved Items count:", savedItems.length);
         
-        // Generate a unique user ID for this session
-        const sessionUserId = Math.random().toString(36).substr(2, 9);
-        
-        // Track currently edited cell
-        let currentlyEditingCell = null;
-        let isCurrentlySaving = false;
-        
-        // Track cells being edited by other users
-        const cellsBeingEditedByOthers = new Map(); // Map of "itemId" to user ID
-        
-        // Set up Supabase realtime subscription
-        function setupRealtimeSubscription() {
-            console.log("Setting up realtime subscription...");
+        // Set up real-time subscription for items
+        const setupRealtimeSubscription = () => {
+            console.log("Setting up real-time subscription for items...");
             
-            // Subscribe to changes in the items table
-            const itemsChannel = supabaseClient.channel('items-changes')
+            if (!supabaseClient) {
+                console.error("Supabase client not initialized, can't set up subscription");
+                return null;
+            }
+            
+            console.log("Creating channel for category:", currentCategory);
+            
+            // Subscribe to changes in the items table for the current category
+            const subscription = supabaseClient
+                .channel('items-changes')
                 .on('postgres_changes', {
-                    event: '*',
+                    event: '*',  // Listen for all events (INSERT, UPDATE, DELETE)
                     schema: 'public',
-                    table: 'items'
+                    table: 'items',
+                    filter: `category=eq.${currentCategory}`
                 }, (payload) => {
-                    console.log('Change received!', payload);
-                    if (!isCurrentlySaving) {
-                        handleRealtimeChange(payload);
-                    }
+                    console.log("Real-time event received:", payload);
+                    handleRealtimeChange(payload);
                 })
-                .subscribe();
-
-            // Also subscribe to the editing status channel
-            const editingChannel = supabaseClient.channel('editing_status')
-                .on(
-                    'broadcast',
-                    { event: 'editing' },
-                    (payload) => {
-                        handleEditingStatus(payload);
+                .subscribe((status) => {
+                    console.log("Subscription status:", status);
+                    
+                    if (status === 'SUBSCRIBED') {
+                        console.log("Successfully subscribed to real-time changes!");
+                    } else if (status === 'CHANNEL_ERROR') {
+                        console.error("Error subscribing to real-time changes");
                     }
-                )
-                .subscribe();
-            
-            // Set up a heartbeat to keep editing status alive
-            setInterval(() => {
-                if (currentlyEditingCell) {
-                    broadcastEditingStatus(currentlyEditingCell, true);
-                }
-            }, 5000);
-            
-            return [itemsChannel, editingChannel];
-        }
-
-        // Handle editing status updates
-        function handleEditingStatus(payload) {
-            console.log('Editing status update:', payload);
-            
-            // If this is our own update, ignore it
-            if (payload.payload.userId === sessionUserId) {
-                return;
-            }
-            
-            const { userId, itemId, isEditing } = payload.payload;
-            
-            // Find all items with matching text
-            document.querySelectorAll('.resource-item').forEach(item => {
-                const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                               item.textContent.replace('×', '').trim();
+                    
+                    // Initialize touch listeners after subscription is set up
+                    setTimeout(addTouchListeners, 500);
+                });
                 
-                if (itemText === itemId) {
-                    if (isEditing) {
-                        // Another user is editing this item
-                        item.classList.add('cell-editing-other');
-                        item.setAttribute('data-editing-user', userId);
-                        
-                        // Disable editing and dragging
-                        const editBtn = item.querySelector('.edit-btn');
-                        if (editBtn) editBtn.style.display = 'none';
-                        item.draggable = false;
-                        
-                        // Add visual indicator
-                        let indicator = item.querySelector('.editing-indicator');
-                        if (!indicator) {
-                            indicator = document.createElement('div');
-                            indicator.className = 'editing-indicator';
-                            item.appendChild(indicator);
-                        }
-                        indicator.textContent = 'Redigeras av annan användare...';
-                        
-                        // Store in our map
-                        cellsBeingEditedByOthers.set(itemId, userId);
-                    } else {
-                        // User stopped editing
-                        item.classList.remove('cell-editing-other');
-                        item.removeAttribute('data-editing-user');
-                        
-                        // Re-enable editing and dragging
-                        const editBtn = item.querySelector('.edit-btn');
-                        if (editBtn) editBtn.style.display = '';
-                        item.draggable = true;
-                        
-                        // Remove editing indicator
-                        const indicator = item.querySelector('.editing-indicator');
-                        if (indicator) {
-                            indicator.remove();
-                        }
-                        
-                        // Remove from our map
-                        cellsBeingEditedByOthers.delete(itemId);
-                    }
-                }
-            });
-        }
-
-        // Broadcast editing status
-        function broadcastEditingStatus(item, isEditing) {
-            const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                           item.textContent.replace('×', '').trim();
-            
-            // Broadcast editing status
-            supabaseClient.channel('editing_status').send({
-                type: 'broadcast',
-                event: 'editing',
-                payload: {
-                    userId: sessionUserId,
-                    itemId: itemText,
-                    isEditing
-                }
-            });
-        }
-
-        // Add some CSS for editing indicators
-        const style = document.createElement('style');
-        style.textContent = `
-            .cell-editing {
-                background-color: rgba(255, 255, 0, 0.1) !important;
-                box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
-                position: relative;
-            }
-            
-            .cell-editing::after {
-                content: "Redigeras...";
-                position: absolute;
-                top: -20px;
-                left: 0;
-                background-color: rgba(0, 123, 255, 0.9);
-                color: white;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 0.7rem;
-                white-space: nowrap;
-                z-index: 100;
-            }
-            
-            .cell-editing-other {
-                background-color: rgba(255, 0, 0, 0.1) !important;
-                position: relative;
-            }
-            
-            .editing-indicator {
-                position: absolute;
-                top: -20px;
-                left: 0;
-                background-color: rgba(220, 53, 69, 0.9);
-                color: white;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 0.7rem;
-                white-space: nowrap;
-                z-index: 100;
-            }
-            
-            .edit-input {
-                width: 100%;
-                padding: 5px;
-                border: 1px solid #ced4da;
-                border-radius: 4px;
-                margin-bottom: 5px;
-            }
-            
-            .save-edit-btn,
-            .cancel-edit-btn {
-                padding: 2px 8px;
-                margin: 0 2px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-            
-            .save-edit-btn {
-                background-color: #28a745;
-                color: white;
-            }
-            
-            .cancel-edit-btn {
-                background-color: #dc3545;
-                color: white;
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Update the editItem function
-        function editItem(element) {
-            const item = element.closest('.resource-item');
-            
-            // If item is being edited by someone else, don't allow editing
-            if (item.classList.contains('cell-editing-other')) {
-                return;
-            }
-            
-            const textContainer = item.querySelector('.resource-item-text');
-            const currentText = textContainer ? textContainer.textContent.trim() : 
-                              item.textContent.replace('×', '').trim();
-            
-            // Store the item's data
-            const entityRow = item.closest('.entity-row');
-            const riskColumn = item.closest('.risk-column');
-            item.dataset.entity = entityRow.querySelector('.entity-title').textContent.trim();
-            item.dataset.riskLevel = getRiskLevel(riskColumn.querySelector('h3').textContent.trim());
-            item.dataset.originalText = currentText;
-            
-            // Broadcast that we're starting to edit
-            broadcastEditingStatus(item, true);
-            currentlyEditingCell = item;
-            
-            // Add visual editing indicator
-            item.classList.add('cell-editing');
-            
-            // Create an input field for editing
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentText;
-            input.className = 'edit-input';
-            
-            // Create save button
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'save-edit-btn';
-            saveBtn.innerHTML = '<i class="bi bi-check"></i>';
-            saveBtn.onclick = function() {
-                saveItemEdit(input.value, currentText, item);
-                // Broadcast that we're done editing
-                broadcastEditingStatus(item, false);
-                currentlyEditingCell = null;
-            };
-            
-            // Create cancel button
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'cancel-edit-btn';
-            cancelBtn.innerHTML = '<i class="bi bi-x"></i>';
-            cancelBtn.onclick = function() {
-                cancelEdit(item, currentText);
-                // Broadcast that we're done editing
-                broadcastEditingStatus(item, false);
-                currentlyEditingCell = null;
-            };
-            
-            // Clear the item and add the input field and buttons
-            const originalContent = item.innerHTML;
-            item.dataset.originalContent = originalContent;
-            item.innerHTML = '';
-            item.appendChild(input);
-            item.appendChild(saveBtn);
-            item.appendChild(cancelBtn);
-            
-            // Focus the input field
-            input.focus();
-            
-            // Disable dragging during edit
-            item.draggable = false;
-        }
-
-        // Update the cancelEdit function
-        function cancelEdit(item, originalText) {
-            // Restore original content
-            if (item.dataset.originalContent) {
-                item.innerHTML = item.dataset.originalContent;
-                delete item.dataset.originalContent;
-            } else {
-                item.innerHTML = `
-                    <div class="resource-item-text">${originalText}</div>
-                    <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                    <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-            }
-            
-            // Remove editing classes
-            item.classList.remove('cell-editing');
-            
-            // Re-enable dragging
-            item.draggable = true;
-            
-            // Add touch event listeners back to the item
-            if (typeof addTouchListenersToElement === 'function') {
-                addTouchListenersToElement(item);
-            }
-        }
-
-        // Helper function to get risk level from text
-        function getRiskLevel(riskText) {
-            if (riskText.includes('Ej risk')) return 'No';
-            if (riskText === '🟡 Risk') return 'At';
-            if (riskText.includes('Hög')) return 'High';
-            return 'Unknown';
-        }
-
+            return subscription;
+        };
+        
         // Handle real-time changes
         const handleRealtimeChange = (payload) => {
             console.log("Real-time change received:", payload);
@@ -815,7 +554,7 @@
                     break;
                     
                 case 'UPDATE':
-                    // Don't ignore own updates - we want to see them in real-time too
+                    // Update the item in place instead of removing and re-adding
                     updateItemInBoard(newItem, oldItem);
                     break;
             }
@@ -832,24 +571,7 @@
                 'High': '🔴 Hög risk'
             };
             
-            // First remove any items with the old text
-            const allEntityRows = document.querySelectorAll('.entity-row');
-            allEntityRows.forEach(row => {
-                const riskColumns = row.querySelectorAll('.risk-column');
-                riskColumns.forEach(column => {
-                    const items = column.querySelectorAll('.resource-item');
-                    items.forEach(item => {
-                        const itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                                       item.textContent.replace('×', '').trim();
-                        if (itemText === oldItem.text && 
-                            row.querySelector('.entity-title').textContent.trim() === oldItem.entity) {
-                            item.remove();
-                        }
-                    });
-                });
-            });
-            
-            // Find the entity row for the new item
+            // Find the entity row
             const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                 .find(row => row.querySelector('.entity-title').textContent.trim() === newItem.entity);
             
@@ -859,35 +581,62 @@
                     .find(col => col.querySelector('h3').textContent.trim() === riskMap[newItem.risk_level]);
                 
                 if (riskColumn) {
-                    // Create new item
-                    const newItemElement = document.createElement('div');
-                    newItemElement.className = 'resource-item';
-                    newItemElement.draggable = true;
-                    newItemElement.setAttribute('ondragstart', 'drag(event)');
-                    newItemElement.id = `realtime_${Math.random().toString(36).substr(2, 9)}`;
-                    newItemElement.innerHTML = `
-                        <div class="resource-item-text">${newItem.text}</div>
-                        <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                        <button class="remove-btn" onclick="removeItem(this)">×</button>`;
+                    // Try to find an existing item with the same text as the old item
+                    const existingItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
+                    const existingItem = existingItems.find(el => {
+                        const itemText = el.querySelector('.resource-item-text')?.textContent.trim() || 
+                                        el.textContent.replace('×', '').trim();
+                        return itemText === oldItem.text;
+                    });
                     
-                    // Insert at the correct position if specified
-                    if (typeof newItem.position === 'number' && newItem.position >= 0) {
-                        const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                        if (newItem.position < allItems.length) {
-                            riskColumn.insertBefore(newItemElement, allItems[newItem.position]);
+                    if (existingItem) {
+                        // Update the existing item's text
+                        const textContainer = existingItem.querySelector('.resource-item-text');
+                        if (textContainer) {
+                            textContainer.textContent = newItem.text;
+                            console.log("Updated item text in place:", newItem.text);
+                            return; // Exit early - we've updated the text in place
                         } else {
-                            riskColumn.appendChild(newItemElement);
+                            // If there's no text container, update the whole item
+                            existingItem.innerHTML = `
+                                <div class="resource-item-text">${newItem.text}</div>
+                                <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
+                                <button class="remove-btn" onclick="removeItem(this)">×</button>`;
+                            
+                            // Add touch event listeners to the updated item
+                            if (typeof addTouchListenersToElement === 'function') {
+                                addTouchListenersToElement(existingItem);
+                            }
+                            console.log("Updated entire item in place:", newItem.text);
+                            return; // Exit early - we've updated the item in place
                         }
-                    } else {
-                        riskColumn.appendChild(newItemElement);
                     }
                     
-                    // Add touch event listeners to the new item
-                    if (typeof addTouchListenersToElement === 'function') {
-                        addTouchListenersToElement(newItemElement);
+                    // If we're here, we couldn't find the item by text, try to find it by position
+                    if (typeof newItem.position === 'number') {
+                        // Get all items in this risk column
+                        const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
+                        
+                        // Check if there's an item at this position
+                        if (newItem.position >= 0 && newItem.position < allItems.length) {
+                            const itemAtPosition = allItems[newItem.position];
+                            
+                            // Update the item at this position
+                            const textContainer = itemAtPosition.querySelector('.resource-item-text');
+                            if (textContainer) {
+                                textContainer.textContent = newItem.text;
+                                console.log("Updated item at position", newItem.position, ":", newItem.text);
+                                return; // Exit early - we've updated the item at the position
+                            }
+                        }
                     }
                 }
             }
+            
+            // If we couldn't find the item to update, fall back to remove and add
+            console.log("Could not find item to update in place, falling back to remove and add");
+            removeItemFromBoard(oldItem);
+            addItemToBoard(newItem);
         };
         
         // Add item to the board
@@ -1283,6 +1032,73 @@
             });
         }
         
+        function editItem(element) {
+            const item = element.closest('.resource-item');
+            const textContainer = item.querySelector('.resource-item-text');
+            const currentText = textContainer ? textContainer.textContent.trim() : item.textContent.replace('×', '').trim();
+            
+            // Get entity and risk level for later use
+            const entityRow = item.closest('.entity-row');
+            const riskColumn = item.closest('.risk-column');
+            const entity = entityRow.querySelector('.entity-title').textContent.trim();
+            const riskText = riskColumn.querySelector('h3').textContent.trim();
+            
+            // Map the risk level text to the database format
+            let riskLevel;
+            if (riskText.includes('Ej risk')) riskLevel = 'No';
+            else if (riskText.includes('Risk') && !riskText.includes('Hög')) riskLevel = 'At';
+            else if (riskText.includes('Hög')) riskLevel = 'High';
+            else riskLevel = 'Unknown';
+            
+            // Get all resource items in this risk column
+            const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
+            
+            // Store the item's position in the DOM for later use
+            // We need to filter to only count resource-item elements
+            const itemPosition = allItems.indexOf(item);
+            console.log("Editing item at position:", itemPosition);
+            
+            // Store position and other data as attributes
+            item.dataset.position = itemPosition;
+            item.dataset.entity = entity;
+            item.dataset.riskLevel = riskLevel;
+            item.dataset.originalText = currentText;
+            
+            // Create an input field for editing
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentText;
+            input.className = 'edit-input';
+            
+            // Create save button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-edit-btn';
+            saveBtn.innerHTML = '<i class="bi bi-check"></i>';
+            saveBtn.onclick = function() {
+                saveItemEdit(input.value, currentText, entity, riskLevel, item);
+            };
+            
+            // Create cancel button
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-edit-btn';
+            cancelBtn.innerHTML = '<i class="bi bi-x"></i>';
+            cancelBtn.onclick = function() {
+                cancelEdit(item, currentText);
+            };
+            
+            // Clear the item and add the input field and buttons
+            item.innerHTML = '';
+            item.appendChild(input);
+            item.appendChild(saveBtn);
+            item.appendChild(cancelBtn);
+            
+            // Focus the input field
+            input.focus();
+            
+            // Disable dragging during edit
+            item.draggable = false;
+        }
+        
         function saveItemEdit(newText, oldText, entity, riskLevel, item) {
             // Get the stored position from the item's dataset
             const position = parseInt(item.dataset.position);
@@ -1349,6 +1165,34 @@
                 // Restore the original text
                 cancelEdit(item, oldText);
             });
+        }
+        
+        function cancelEdit(item, originalText) {
+            // For resources
+            if (item.id.startsWith('resource_')) {
+                const resourceId = item.id.replace('resource_', '');
+                item.innerHTML = `
+                    <div class="resource-item-text">${originalText}</div>
+                    <button class="edit-btn" onclick="editResourceItem(this, '${resourceId}')"><i class="bi bi-pencil"></i></button>
+                    <button class="remove-btn" onclick="removeResourceItem(this, '${resourceId}')">×</button>
+                `;
+            } 
+            // For board items
+            else {
+                item.innerHTML = `
+                    <div class="resource-item-text">${originalText}</div>
+                    <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
+                    <button class="remove-btn" onclick="removeItem(this)">×</button>
+                `;
+            }
+            
+            // Re-enable dragging
+            item.draggable = true;
+            
+            // Add touch event listeners back to the item
+            if (typeof addTouchListenersToElement === 'function') {
+                addTouchListenersToElement(item);
+            }
         }
     </script>
     
