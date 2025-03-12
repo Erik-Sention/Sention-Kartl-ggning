@@ -1198,13 +1198,14 @@
     
     <div class="header">
         <h2>SENTION Alternativ Kartläggning</h2>
-        <div class="navbar-links">
+         <div class="navbar-links">
             <a href="{{ url_for('home', category='anstalld') }}" class="{{ 'active' if current_category == 'anstalld' else '' }}">Anställd</a>
             <a href="{{ url_for('home', category='grupp') }}" class="{{ 'active' if current_category == 'grupp' else '' }}">Grupp</a>
             <a href="{{ url_for('home', category='organisation') }}" class="{{ 'active' if current_category == 'organisation' else '' }}">Organisation</a>
             <a href="{{ url_for('home', category='foretagsledning') }}" class="{{ 'active' if current_category == 'foretagsledning' else '' }}">Företagsledning</a>
             <a href="{{ url_for('home', category='managers') }}" class="{{ 'active' if current_category == 'managers' else '' }}">Managers L6</a>
             <a href="{{ url_for('home', category='supervisors') }}" class="{{ 'active' if current_category == 'supervisors' else '' }}">Supervisors AC</a>
+            <a href="{{ url_for('home', category='system') }}" class="{{ 'active' if current_category == 'system' else '' }}">System</a>
         </div>
         <div class="nav-buttons">
             <a href="{{ url_for('profile') }}" class="profile-btn"><i class="bi bi-person"></i> Min profil</a>
