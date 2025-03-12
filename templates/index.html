@@ -558,32 +558,73 @@
             }
             
             // Subscribe to the editing status channel
-            const editingChannel = supabaseClient.channel('editing_status')
-                .on(
-                    'broadcast',
-                    { event: 'editing' },
-                    (payload) => {
-                        handleEditingStatus(payload);
+            const channel = supabaseClient.channel('editing-status', {
+                config: {
+                    broadcast: { self: true }
+                }
+            });
+
+            channel
+                .on('broadcast', { event: 'editing' }, (payload) => {
+                    console.log('Received editing status:', payload);
+                    handleEditingStatus(payload);
+                })
+                .subscribe((status) => {
+                    console.log("Editing status subscription status:", status);
+                    if (status === 'SUBSCRIBED') {
+                        console.log("Successfully subscribed to editing status updates!");
                     }
-                )
-                .subscribe();
-                
+                });
+            
             // Set up a heartbeat to keep editing status alive
-            setInterval(() => {
+            const heartbeatInterval = setInterval(() => {
                 if (currentlyEditingCell) {
-                    // Re-broadcast our editing status every 5 seconds to keep it alive
                     broadcastEditingStatus(currentlyEditingCell, true);
                 }
             }, 5000);
+
+            // Clean up on page unload
+            window.addEventListener('beforeunload', () => {
+                clearInterval(heartbeatInterval);
+                if (currentlyEditingCell) {
+                    broadcastEditingStatus(currentlyEditingCell, false);
+                }
+                channel.unsubscribe();
+            });
             
-            return editingChannel;
+            return channel;
         }
-        
+
+        // Broadcast editing status
+        function broadcastEditingStatus(element, isEditing) {
+            if (!supabaseClient) {
+                console.error("Supabase client not initialized, can't broadcast editing status");
+                return;
+            }
+
+            console.log('Broadcasting editing status:', {
+                userId: sessionUserId,
+                elementId: element.id,
+                isEditing
+            });
+
+            supabaseClient.channel('editing-status').send({
+                type: 'broadcast',
+                event: 'editing',
+                payload: {
+                    userId: sessionUserId,
+                    elementId: element.id,
+                    isEditing,
+                    timestamp: Date.now()
+                }
+            });
+        }
+
         // Handle editing status updates
         function handleEditingStatus(payload) {
-            console.log('Editing status update:', payload);
+            console.log('Editing status update received:', payload);
             
-            const { userId, elementId, isEditing } = payload.payload;
+            const { userId, elementId, isEditing, timestamp } = payload.payload;
             
             // Find the element
             const element = document.getElementById(elementId);
@@ -596,8 +637,12 @@
             if (userId === sessionUserId) {
                 if (isEditing) {
                     currentlyEditingCell = element;
+                    element.classList.add('cell-editing');
                 } else {
-                    currentlyEditingCell = null;
+                    if (currentlyEditingCell === element) {
+                        currentlyEditingCell = null;
+                    }
+                    element.classList.remove('cell-editing');
                 }
                 return;
             }
@@ -610,10 +655,13 @@
                 cellsBeingEditedByOthers.set(elementId, userId);
                 
                 // Add tooltip to show who is editing
-                const tooltip = document.createElement('div');
-                tooltip.className = 'editing-tooltip';
+                let tooltip = element.querySelector('.editing-tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'editing-tooltip';
+                    element.appendChild(tooltip);
+                }
                 tooltip.textContent = 'Redigeras av annan användare';
-                element.appendChild(tooltip);
             } else {
                 // User stopped editing
                 element.classList.remove('cell-editing-other');
@@ -630,21 +678,7 @@
             // Update the visual state of all items
             applyEditingIndicators();
         }
-        
-        // Broadcast editing status
-        function broadcastEditingStatus(element, isEditing) {
-            // Broadcast editing status
-            supabaseClient.channel('editing_status').send({
-                type: 'broadcast',
-                event: 'editing',
-                payload: {
-                    userId: sessionUserId,
-                    elementId: element.id,
-                    isEditing
-                }
-            });
-        }
-        
+
         // Apply editing indicators for elements being edited by others
         function applyEditingIndicators() {
             // First, clear all editing indicators
@@ -667,8 +701,9 @@
                     element.setAttribute('contenteditable', 'false');
                     
                     // Ensure tooltip exists
-                    if (!element.querySelector('.editing-tooltip')) {
-                        const tooltip = document.createElement('div');
+                    let tooltip = element.querySelector('.editing-tooltip');
+                    if (!tooltip) {
+                        tooltip = document.createElement('div');
                         tooltip.className = 'editing-tooltip';
                         tooltip.textContent = 'Redigeras av annan användare';
                         element.appendChild(tooltip);
@@ -676,7 +711,7 @@
                 }
             });
         }
-        
+
         // Function to generate UUID for elements
         function generateUUID() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
