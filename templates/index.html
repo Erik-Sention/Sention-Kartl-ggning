@@ -145,12 +145,19 @@
 
         /* Container drag-over styles */
         .items-container.container-drag-over {
-            background-color: rgba(13, 110, 253, 0.05);
+            background-color: rgba(13, 110, 253, 0.1);
             border: 2px dashed #0d6efd;
             border-radius: 6px;
             padding: 10px;
             min-height: 60px;
             animation: pulse 1.5s infinite;
+        }
+
+        /* Empty container styles */
+        .items-container {
+            width: 100%;
+            min-height: 50px; /* Ensure empty containers have some height */
+            transition: all 0.2s ease;
         }
 
         .item-text {
@@ -241,10 +248,6 @@
 
         .risk-column.high-risk {
             background-color: rgba(220, 53, 69, 0.1); /* Light red */
-        }
-
-        .items-container {
-            width: 100%;
         }
 
         /* Cell being edited styles */
@@ -1777,7 +1780,7 @@
             // Handle drag over empty containers
             else {
                 const container = e.target.closest('.items-container');
-                if (container && (!container.contains(draggedItem) || container.children.length === 0)) {
+                if (container) {
                     // Remove drag-over class from all containers
                     const containers = document.querySelectorAll('.items-container');
                     containers.forEach(c => c.classList.remove('container-drag-over'));
@@ -1964,11 +1967,12 @@
                     
                     // Don't allow dragging if any cell is being edited
                     if (currentlyEditingCell) {
-                    return;
-                }
-                
-                    // If container is empty or doesn't contain the dragged item
-                    if (draggedItem && (!this.contains(draggedItem) || this.children.length === 0)) {
+                        return;
+                    }
+                    
+                    // Make sure the container is a valid drop target
+                    // This is important for empty containers
+                    if (draggedItem) {
                         // Remove drag-over class from all containers
                         const containers = document.querySelectorAll('.items-container');
                         containers.forEach(c => c.classList.remove('container-drag-over'));
@@ -1986,8 +1990,8 @@
                         return;
                     }
                     
-                    // If we have a dragged item and we're not dropping on another item
-                    if (draggedItem && !e.target.closest('.item')) {
+                    // If we have a dragged item
+                    if (draggedItem) {
                         console.log('Dropping directly on container:', this);
                         
                         // Remove container drag-over class
