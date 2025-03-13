@@ -213,6 +213,8 @@
         .entity-row {
             margin: 20px;
             width: calc(100% - 40px); /* Full width minus margins */
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         .risk-columns {
@@ -288,7 +290,7 @@
 
         /* Status message styles */
         .status-message {
-            margin-top: 15px;
+            margin: 15px 20px;
             padding: 10px;
             border-radius: 4px;
             display: none;
@@ -309,7 +311,7 @@
         /* Auto-save indicator */
         .auto-save-indicator {
             display: inline-block;
-            margin: 15px;
+            margin: 15px 20px;
             font-size: 0.9rem;
             color: #6c757d;
         }
@@ -640,6 +642,13 @@
                 transform: translateX(0);
                 opacity: 1;
             }
+        }
+
+        /* Container styles to ensure consistent margins */
+        .container {
+            margin: 0 20px;
+            width: calc(100% - 40px);
+            box-sizing: border-box;
         }
     </style>
 </head>
