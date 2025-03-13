@@ -992,8 +992,8 @@
             // Don't reload if we're currently saving (to avoid duplicate updates)
             if (isCurrentlySaving) {
                 console.log('Not reloading because we are currently saving');
-                return;
-            }
+                        return;
+                    }
             
             // If this is an INSERT event, we can handle it directly without fetching all items
             if (payload.eventType === 'INSERT') {
@@ -1017,8 +1017,8 @@
                                 textElement.textContent = newItem.text || '';
                                 ratingElement.textContent = newItem.rating || '';
                                 foundEmptyItem = true;
-                                break;
-                            }
+                    break;
+            }
                         }
                         
                         // If we didn't find an empty item, create a new one
@@ -1242,7 +1242,7 @@
             }
             
             // If the item exists, update it
-            if (existingItem) {
+                    if (existingItem) {
                 // Check if the risk level has changed
                 if (oldItem.risk_level !== item.risk_level || oldItem.entity !== item.entity) {
                     // Find the new container
@@ -1269,7 +1269,7 @@
                             // Add to new container at the correct position
                             if (container.children.length > item.position) {
                                 container.insertBefore(existingItem, container.children[item.position]);
-                            } else {
+                        } else {
                                 container.appendChild(existingItem);
                             }
                             
@@ -1361,21 +1361,21 @@
                     
                     // Skip if this item is currently being edited
                     if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
-                        return;
-                    }
-                    
+                return;
+            }
+            
                     // Find the correct container
-                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === item.entity);
-                    
-                    if (entityRow) {
+            
+            if (entityRow) {
                         const riskColumn = entityRow.querySelector(
                             item.risk_level === 'No' ? '.no-risk' :
                             item.risk_level === 'At' ? '.at-risk' :
                             '.high-risk'
                         );
-                        
-                        if (riskColumn) {
+                
+                if (riskColumn) {
                             const container = riskColumn.querySelector('.items-container');
                             
                             if (existingItem) {
@@ -1419,7 +1419,7 @@
                                 
                                 ratingElement.textContent = item.rating || '';
                             } else {
-                                // Create new item
+                        // Create new item
                                 const itemElement = document.createElement('div');
                                 itemElement.className = 'item';
                                 itemElement.setAttribute('draggable', 'true');
@@ -1440,7 +1440,7 @@
                                 // Add to container at the correct position
                                 if (container.children.length > item.position) {
                                     container.insertBefore(itemElement, container.children[item.position]);
-                                } else {
+                            } else {
                                     container.appendChild(itemElement);
                                 }
                                 
@@ -1680,9 +1680,6 @@
             const column = button.closest('.risk-column');
             const container = column.querySelector('.items-container');
             
-            // Generate a unique ID for this item
-            const itemId = generateUUID();
-            
             // Check if there's already an empty item in this container
             // If so, focus on that instead of creating a new one
             const existingEmptyItems = container.querySelectorAll('.item');
@@ -1698,6 +1695,9 @@
                     return;
                 }
             }
+            
+            // Generate a unique ID for this item
+            const itemId = generateUUID();
             
             // Create new item
             const item = document.createElement('div');
@@ -1744,12 +1744,7 @@
             initializeDragForItem(item);
             
             // Broadcast the new item to other users
-            // We'll only broadcast the ID and basic info, not the content yet
-            // Content will be broadcast when the user finishes editing
             broadcastNewItem(entity, riskLevel, itemId);
-            
-            // We don't trigger auto-save here - we'll save when the user adds content
-            // This prevents empty cells from being saved to the database
         }
 
         // Broadcast new item
@@ -1903,7 +1898,7 @@
             const itemId = item.getAttribute('data-item-id');
             
             // Remove the item from DOM
-            item.remove();
+                item.remove();
             
             // Broadcast the deletion to other users
             broadcastItemDeletion(entityId, riskLevel, itemId);
@@ -1964,59 +1959,6 @@
                 setTimeout(() => {
                     autoSaveIndicator.innerHTML = '';
                 }, 2000);
-                
-                // If we have updated items from the server, update our DOM with the server's version
-                // This ensures we're in sync with the database and prevents duplicates
-                if (data.items && Array.isArray(data.items)) {
-                    console.log('Received updated items from server:', data.items);
-                    
-                    // Only update the DOM if we're not currently editing
-                    if (!currentlyEditingCell) {
-                        // Create a map of existing items for quick lookup
-                        const existingItemsMap = new Map();
-                        document.querySelectorAll('.item').forEach(item => {
-                            const itemId = item.getAttribute('data-item-id');
-                            existingItemsMap.set(itemId, item);
-                        });
-                        
-                        // Create a map of server items for quick lookup
-                        const serverItemsMap = new Map();
-                        data.items.forEach(item => {
-                            serverItemsMap.set(item.id, item);
-                        });
-                        
-                        // Remove items that don't exist on the server
-                        existingItemsMap.forEach((domItem, itemId) => {
-                            if (!serverItemsMap.has(itemId)) {
-                                // This item doesn't exist on the server, remove it from DOM
-                                domItem.remove();
-                            }
-                        });
-                        
-                        // Update or add items from the server
-                        data.items.forEach(serverItem => {
-                            const domItem = document.querySelector(`.item[data-item-id="${serverItem.id}"]`);
-                            
-                            if (domItem) {
-                                // Update existing item attributes to match server
-                                const currentRiskLevel = domItem.getAttribute('data-risk');
-                                const currentEntity = domItem.getAttribute('data-entity');
-                                
-                                // Only update if risk level or entity has changed
-                                if (currentRiskLevel !== serverItem.risk_level || currentEntity !== serverItem.entity) {
-                                    updateItemInDOM(serverItem, {
-                                        risk_level: currentRiskLevel,
-                                        entity: currentEntity,
-                                        position: -1
-                                    });
-                                }
-                            } else {
-                                // This is a new item from the server, add it to the DOM
-                                addItemToDOM(serverItem);
-                            }
-                        });
-                    }
-                }
                 
                 // Reset saving flag
                 isCurrentlySaving = false;
@@ -2283,9 +2225,9 @@
                                 // Prevent editing if cell is being edited by another user
                                 if (textElement.classList.contains('cell-editing-other')) {
                                     e.preventDefault();
-                                    return;
-                                }
-                                
+                    return;
+                }
+                
                                 if (textElement.getAttribute('contenteditable') === 'false') {
                                     textElement.setAttribute('contenteditable', 'true');
                                     textElement.focus();
@@ -2318,8 +2260,8 @@
                 
                 channels.forEach(channel => {
                     supabaseClient.removeChannel(channel);
-                });
             });
+        });
 
             // Initialize drag and drop for all containers
             initializeDragAndDrop();
@@ -2688,6 +2630,7 @@
         // Function to collect all items data
         function collectItemsData() {
             const items = [];
+            const processedIds = new Set(); // Track processed IDs to avoid duplicates
             
             // Get all entity rows
             const entityRows = document.querySelectorAll('.entity-row');
@@ -2713,6 +2656,12 @@
                         const rating = item.querySelector('.item-rating').textContent.trim();
                         const itemId = item.getAttribute('data-item-id');
                         
+                        // Skip if we've already processed this ID (avoid duplicates)
+                        if (processedIds.has(itemId)) {
+                            console.log('Skipping duplicate item ID:', itemId);
+                            return;
+                        }
+                        
                         // Only include items that have either text or rating
                         if (text || rating) {
                             items.push({
@@ -2724,6 +2673,9 @@
                                 rating: rating,
                                 position: index
                             });
+                            
+                            // Mark this ID as processed
+                            processedIds.add(itemId);
                         }
                     });
                 });
