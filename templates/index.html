@@ -959,13 +959,6 @@
                         handleItemDeletion(payload);
                     }
                 )
-                .on(
-                    'broadcast',
-                    { event: 'new_item' },
-                    (payload) => {
-                        handleNewItem(payload);
-                    }
-                )
                 .subscribe();
                 
             // Set up a heartbeat to keep editing status alive
@@ -989,89 +982,19 @@
                 return;
             }
             
-            // Don't reload if we're currently saving (to avoid duplicate updates)
-            if (isCurrentlySaving) {
-                console.log('Not reloading because we are currently saving');
-                        return;
-                    }
-            
-            // If this is an INSERT event, we can handle it directly without fetching all items
-            if (payload.eventType === 'INSERT') {
-                const newItem = payload.new;
-                if (newItem && newItem.category === currentCategory) {
-                    // Check if this item already exists in the DOM
-                    const existingItem = document.querySelector(`.item[data-item-id="${newItem.id}"]`);
-                    if (!existingItem) {
-                        // Check if there's an empty item that we can use instead of creating a new one
-                        const emptyItems = document.querySelectorAll(`.item[data-entity="${newItem.entity}"][data-risk="${newItem.risk_level}"]`);
-                        let foundEmptyItem = false;
-                        
-                        for (const item of emptyItems) {
-                            const textElement = item.querySelector('.item-text');
-                            const ratingElement = item.querySelector('.item-rating');
-                            
-                            // If we find an empty item, use that instead of creating a new one
-                            if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
-                                console.log('Found empty item, updating it with server data');
-                                item.setAttribute('data-item-id', newItem.id);
-                                textElement.textContent = newItem.text || '';
-                                ratingElement.textContent = newItem.rating || '';
-                                foundEmptyItem = true;
-                    break;
-            }
-                        }
-                        
-                        // If we didn't find an empty item, create a new one
-                        if (!foundEmptyItem) {
-                            addItemToDOM(newItem);
-                        }
-                        return;
-                    } else {
-                        // Item exists but might need updating
-                        updateItemInDOM(newItem, {
-                            risk_level: existingItem.getAttribute('data-risk'),
-                            entity: existingItem.getAttribute('data-entity'),
-                            position: -1
-                        });
-                        return;
-                    }
-                }
-            }
-            
-            // If this is an UPDATE event, we can handle it directly without fetching all items
-            if (payload.eventType === 'UPDATE') {
-                const updatedItem = payload.new;
-                if (updatedItem && updatedItem.category === currentCategory) {
-                    updateItemInDOM(updatedItem, payload.old);
-                    return;
-                }
-            }
-            
-            // If this is a DELETE event, we can handle it directly without fetching all items
-            if (payload.eventType === 'DELETE') {
-                const deletedItem = payload.old;
-                if (deletedItem && deletedItem.category === currentCategory) {
-                    removeItemFromDOM(deletedItem);
-                    return;
-                }
-            }
-            
-            // For other cases or if direct handling fails, fetch all items
+            // Instead of reloading the entire page, fetch only the updated data
             fetch(`/get_items?category=${currentCategory}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        // Only update if we're not currently editing or saving
-                        if (!currentlyEditingCell && !isCurrentlySaving) {
-                            updateItemsInDOM(data.items);
-                            
-                            // Show a subtle notification that content was updated
-                            const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                            autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
-                            setTimeout(() => {
-                                autoSaveIndicator.innerHTML = '';
-                            }, 2000);
-                        }
+                        updateItemsInDOM(data.items);
+                        
+                        // Show a subtle notification that content was updated
+                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                        autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
+                        setTimeout(() => {
+                            autoSaveIndicator.innerHTML = '';
+                        }, 2000);
                     } else {
                         console.error('Error fetching updated items:', data.message);
                     }
@@ -1081,264 +1004,8 @@
                 });
         }
         
-        // Function to clean up empty items
-        function cleanupEmptyItems() {
-            // Find all items
-            const items = document.querySelectorAll('.item');
-            
-            items.forEach(item => {
-                const textElement = item.querySelector('.item-text');
-                const ratingElement = item.querySelector('.item-rating');
-                
-                // If both text and rating are empty, remove the item
-                if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
-                    // Skip if this item is currently being edited
-                    if (textElement.classList.contains('cell-editing') || textElement.classList.contains('cell-editing-other')) {
-                        return;
-                    }
-                    
-                    // Remove the item
-                    item.remove();
-                }
-            });
-        }
-        
-        // Function to trigger auto-save with debounce
-        function triggerAutoSave() {
-            // Show saving indicator
-            const autoSaveIndicator = document.getElementById('auto-save-indicator');
-            autoSaveIndicator.innerHTML = '<span class="saving">Sparar...</span>';
-            
-            // Clear previous timeout
-            if (saveTimeout) {
-                clearTimeout(saveTimeout);
-            }
-            
-            // Set new timeout
-            saveTimeout = setTimeout(() => {
-                saveDataToSupabase();
-            }, saveDelay);
-        }
-        
-        // Function to add new item to the DOM
-        function addItemToDOM(item) {
-            // Check if this item already exists (to avoid duplicates)
-            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
-            if (existingItem) {
-                console.log('Item already exists, updating instead of creating duplicate');
-                // Only update if not being edited
-                const textElement = existingItem.querySelector('.item-text');
-                if (!textElement.classList.contains('cell-editing') && !textElement.classList.contains('cell-editing-other')) {
-                    updateItemInDOM(item, {
-                        risk_level: existingItem.getAttribute('data-risk'),
-                        entity: existingItem.getAttribute('data-entity'),
-                        position: -1 // Force position update
-                    });
-                }
-                return;
-            }
-            
-            // Check if there's an empty item that we can use instead of creating a new one
-            const emptyItems = document.querySelectorAll(`.item[data-entity="${item.entity}"][data-risk="${item.risk_level}"]`);
-            let foundEmptyItem = false;
-            
-            for (const emptyItem of emptyItems) {
-                const textElement = emptyItem.querySelector('.item-text');
-                const ratingElement = emptyItem.querySelector('.item-rating');
-                
-                // If we find an empty item, use that instead of creating a new one
-                if (!textElement.textContent.trim() && !ratingElement.textContent.trim() && 
-                    !textElement.classList.contains('cell-editing') && 
-                    !textElement.classList.contains('cell-editing-other')) {
-                    console.log('Found empty item, updating it with server data');
-                    emptyItem.setAttribute('data-item-id', item.id);
-                    textElement.textContent = item.text || '';
-                    ratingElement.textContent = item.rating || '';
-                    foundEmptyItem = true;
-                    break;
-                }
-            }
-            
-            // If we found and updated an empty item, return
-            if (foundEmptyItem) {
-                return;
-            }
-            
-            // Find the correct container
-            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                .find(row => row.querySelector('.entity-title').textContent === item.entity);
-            
-            if (entityRow) {
-                const riskColumn = entityRow.querySelector(
-                    item.risk_level === 'No' ? '.no-risk' :
-                    item.risk_level === 'At' ? '.at-risk' :
-                    '.high-risk'
-                );
-                
-                if (riskColumn) {
-                    const container = riskColumn.querySelector('.items-container');
-                    
-                    // Create new item
-                    const itemElement = document.createElement('div');
-                    itemElement.className = 'item';
-                    itemElement.setAttribute('draggable', 'true');
-                    itemElement.setAttribute('data-entity', item.entity);
-                    itemElement.setAttribute('data-risk', item.risk_level);
-                    itemElement.setAttribute('data-item-id', item.id);
-                    
-                    // Use empty string if rating is null, undefined, or empty
-                    const ratingValue = item.rating || '';
-                    
-                    itemElement.innerHTML = `
-                        <i class="bi bi-grip-vertical drag-handle"></i>
-                        <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text || ''}</div>
-                        <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
-                        <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
-                    `;
-                    
-                    // Add to container at the correct position
-                    if (container.children.length > item.position && item.position >= 0) {
-                        container.insertBefore(itemElement, container.children[item.position]);
-                    } else {
-                        container.appendChild(itemElement);
-                    }
-                    
-                    // Add click handler to make text editable when clicked
-                    const textElement = itemElement.querySelector('.item-text');
-                    textElement.addEventListener('click', function(e) {
-                        // Prevent editing if cell is being edited by another user
-                        if (textElement.classList.contains('cell-editing-other')) {
-                            e.preventDefault();
-                            return;
-                        }
-                        
-                        if (textElement.getAttribute('contenteditable') === 'false') {
-                            textElement.setAttribute('contenteditable', 'true');
-                            textElement.focus();
-                        }
-                    });
-                    
-                    // Initialize drag and drop for this item
-                    initializeDragForItem(itemElement);
-                    
-                    // Show a subtle notification that content was updated
-                    const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                    autoSaveIndicator.innerHTML = 'Nytt objekt tillagt';
-                    setTimeout(() => {
-                        autoSaveIndicator.innerHTML = '';
-                    }, 2000);
-                }
-            }
-        }
-        
-        // Update an existing item in the DOM
-        function updateItemInDOM(item, oldItem) {
-            // Find the item
-            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
-            
-            // Skip if this item is currently being edited
-            if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
-                return;
-            }
-            
-            // If the item exists, update it
-                    if (existingItem) {
-                // Check if the risk level has changed
-                if (oldItem.risk_level !== item.risk_level || oldItem.entity !== item.entity) {
-                    // Find the new container
-                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                        .find(row => row.querySelector('.entity-title').textContent === item.entity);
-                    
-                    if (entityRow) {
-                        const riskColumn = entityRow.querySelector(
-                            item.risk_level === 'No' ? '.no-risk' :
-                            item.risk_level === 'At' ? '.at-risk' :
-                            '.high-risk'
-                        );
-                        
-                        if (riskColumn) {
-                            const container = riskColumn.querySelector('.items-container');
-                            
-                            // Remove from old container
-                            existingItem.remove();
-                            
-                            // Update attributes
-                            existingItem.setAttribute('data-entity', item.entity);
-                            existingItem.setAttribute('data-risk', item.risk_level);
-                            
-                            // Add to new container at the correct position
-                            if (container.children.length > item.position) {
-                                container.insertBefore(existingItem, container.children[item.position]);
-                        } else {
-                                container.appendChild(existingItem);
-                            }
-                            
-                            // Show a notification
-                            const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                            autoSaveIndicator.innerHTML = 'Objekt flyttat';
-                            setTimeout(() => {
-                                autoSaveIndicator.innerHTML = '';
-                            }, 2000);
-                        }
-                    }
-                } else if (oldItem.position !== item.position && oldItem.position !== -1) {
-                    // Position has changed but risk level is the same
-                    const container = existingItem.parentNode;
-                    
-                    // Remove from current position
-                    existingItem.remove();
-                    
-                    // Add at new position
-                    if (container.children.length > item.position) {
-                        container.insertBefore(existingItem, container.children[item.position]);
-                    } else {
-                        container.appendChild(existingItem);
-                    }
-                }
-                
-                // Update content
-                const textElement = existingItem.querySelector('.item-text');
-                const ratingElement = existingItem.querySelector('.item-rating');
-                
-                // Only update if not being edited
-                if (!textElement.classList.contains('cell-editing') && !textElement.classList.contains('cell-editing-other')) {
-                    textElement.textContent = item.text;
-                }
-                
-                ratingElement.textContent = item.rating || '';
-            } else {
-                // If the item doesn't exist, add it
-                addItemToDOM(item);
-            }
-        }
-        
-        // Remove an item from the DOM
-        function removeItemFromDOM(item) {
-            // Find the item
-            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
-            
-            // Skip if this item is currently being edited
-            if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
-                return;
-            }
-            
-            // If the item exists, remove it
-            if (existingItem) {
-                existingItem.remove();
-                
-                // Show a notification
-                const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                autoSaveIndicator.innerHTML = 'Objekt borttaget';
-                setTimeout(() => {
-                    autoSaveIndicator.innerHTML = '';
-                }, 2000);
-            }
-        }
-        
         // Function to update items in the DOM without reloading the page
         function updateItemsInDOM(items) {
-            console.log('Updating items in DOM:', items);
-            
             // Create a map of existing items for quick lookup
             const existingItemsMap = new Map();
             document.querySelectorAll('.item').forEach(item => {
@@ -1361,9 +1028,9 @@
                     
                     // Skip if this item is currently being edited
                     if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
-                return;
-            }
-            
+                        return;
+                    }
+                    
                     // Find the correct container
             const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === item.entity);
@@ -1377,8 +1044,8 @@
                 
                 if (riskColumn) {
                             const container = riskColumn.querySelector('.items-container');
-                            
-                            if (existingItem) {
+                    
+                    if (existingItem) {
                                 // Check if the item needs to be moved to a different container
                                 const currentContainer = existingItem.parentNode;
                                 const currentRiskLevel = existingItem.getAttribute('data-risk');
@@ -1391,7 +1058,7 @@
                                     // Add to new container at the correct position
                                     if (container.children.length > item.position) {
                                         container.insertBefore(existingItem, container.children[item.position]);
-                                    } else {
+                        } else {
                                         container.appendChild(existingItem);
                                     }
                                 } else if (currentContainer === container) {
@@ -1419,7 +1086,7 @@
                                 
                                 ratingElement.textContent = item.rating || '';
                             } else {
-                        // Create new item
+                                // Create new item
                                 const itemElement = document.createElement('div');
                                 itemElement.className = 'item';
                                 itemElement.setAttribute('draggable', 'true');
@@ -1440,7 +1107,7 @@
                                 // Add to container at the correct position
                                 if (container.children.length > item.position) {
                                     container.insertBefore(itemElement, container.children[item.position]);
-                            } else {
+                                } else {
                                     container.appendChild(itemElement);
                                 }
                                 
@@ -1680,22 +1347,6 @@
             const column = button.closest('.risk-column');
             const container = column.querySelector('.items-container');
             
-            // Check if there's already an empty item in this container
-            // If so, focus on that instead of creating a new one
-            const existingEmptyItems = container.querySelectorAll('.item');
-            for (const existingItem of existingEmptyItems) {
-                const textElement = existingItem.querySelector('.item-text');
-                const ratingElement = existingItem.querySelector('.item-rating');
-                
-                // If we find an empty item, focus on it instead of creating a new one
-                if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
-                    console.log('Found empty item, focusing on it instead of creating a new one');
-                    textElement.setAttribute('contenteditable', 'true');
-                    textElement.focus();
-                    return;
-                }
-            }
-            
             // Generate a unique ID for this item
             const itemId = generateUUID();
             
@@ -1730,9 +1381,9 @@
                     // Prevent editing if cell is being edited by another user
                     if (textElement.classList.contains('cell-editing-other')) {
                         e.preventDefault();
-                        return;
-                    }
-                    
+                return;
+            }
+            
                     if (textElement.getAttribute('contenteditable') === 'false') {
                         textElement.setAttribute('contenteditable', 'true');
                         textElement.focus();
@@ -1743,23 +1394,8 @@
             // Add drag and drop event listeners
             initializeDragForItem(item);
             
-            // Broadcast the new item to other users
-            broadcastNewItem(entity, riskLevel, itemId);
-        }
-
-        // Broadcast new item
-        function broadcastNewItem(entity, riskLevel, itemId) {
-            // Broadcast new item
-            supabaseClient.channel('editing_status').send({
-                type: 'broadcast',
-                event: 'new_item',
-                payload: {
-                    userId: sessionUserId,
-                    entityId: entity,
-                    riskLevel: riskLevel,
-                    itemId: itemId
-                }
-            });
+            // Trigger auto-save
+            triggerAutoSave();
         }
 
         // Function to handle cell focus
@@ -1788,25 +1424,8 @@
                 currentlyEditingCell = null;
             }
             
-            // Only trigger auto-save if there's actual content
-            if (newText) {
-                triggerAutoSave();
-            } else {
-                // If the cell is empty after editing, consider removing it
-                const item = cell.closest('.item');
-                const ratingElement = item.querySelector('.item-rating');
-                
-                // Only remove if both text and rating are empty
-                if (!ratingElement.textContent.trim()) {
-                    // This is an empty item, remove it
-                    item.remove();
-                    // Still trigger auto-save to remove it from the database
-                    triggerAutoSave();
-                } else {
-                    // There's a rating but no text, still save
-                    triggerAutoSave();
-                }
-            }
+            // Trigger auto-save
+            triggerAutoSave();
         }
 
         // Function to show rating selector
@@ -1844,10 +1463,6 @@
         // Function to select a rating
         function selectRating(rating) {
             if (currentRatingCell) {
-                // Get the previous rating value
-                const previousRating = currentRatingCell.textContent;
-                
-                // Update the rating
                 currentRatingCell.textContent = rating;
                 
                 // Hide selector
@@ -1857,14 +1472,8 @@
                 // Broadcast the rating change to other users
                 broadcastRatingChange(currentRatingCell, rating);
                 
-                // Get the item and check if it has text content
-                const item = currentRatingCell.closest('.item');
-                const textElement = item.querySelector('.item-text');
-                
-                // Only trigger auto-save if there's text content or if the rating changed
-                if (textElement.textContent.trim() || rating !== previousRating) {
-                    triggerAutoSave();
-                }
+                // Trigger auto-save
+                triggerAutoSave();
             }
         }
         
@@ -1898,7 +1507,7 @@
             const itemId = item.getAttribute('data-item-id');
             
             // Remove the item from DOM
-                item.remove();
+            item.remove();
             
             // Broadcast the deletion to other users
             broadcastItemDeletion(entityId, riskLevel, itemId);
@@ -1922,25 +1531,101 @@
             });
         }
         
+        // Function to trigger auto-save with debounce
+        function triggerAutoSave() {
+            // Show saving indicator
+            const autoSaveIndicator = document.getElementById('auto-save-indicator');
+            autoSaveIndicator.innerHTML = '<span class="saving">Sparar...</span>';
+            
+            // Clear previous timeout
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            
+            // Set new timeout
+            saveTimeout = setTimeout(() => {
+                saveDataToSupabase();
+            }, saveDelay);
+        }
+        
+        // Function to show status message
+        function showStatusMessage(message, isSuccess) {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message';
+            
+            if (isSuccess) {
+                statusMessage.classList.add('success-message');
+            } else {
+                statusMessage.classList.add('error-message');
+            }
+            
+            statusMessage.style.display = 'block';
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Function to collect all items data
+        function collectItemsData() {
+            const items = [];
+            
+            // Get all entity rows
+            const entityRows = document.querySelectorAll('.entity-row');
+            
+            entityRows.forEach(entityRow => {
+                const entity = entityRow.querySelector('.entity-title').textContent;
+                
+                // Get all risk columns in this entity row
+                const riskColumns = entityRow.querySelectorAll('.risk-column');
+                
+                riskColumns.forEach(column => {
+                    // Determine risk level
+                    let riskLevel = 'Unknown';
+                    if (column.classList.contains('no-risk')) riskLevel = 'No';
+                    if (column.classList.contains('at-risk')) riskLevel = 'At';
+                    if (column.classList.contains('high-risk')) riskLevel = 'High';
+                    
+                    // Get all items in this column
+                    const itemElements = column.querySelectorAll('.item');
+                    
+                    itemElements.forEach((item, index) => {
+                        const text = item.querySelector('.item-text').textContent.trim();
+                        const rating = item.querySelector('.item-rating').textContent.trim();
+                        
+                        if (text) {
+                            items.push({
+                                text: text,
+                                entity: entity,
+                                risk_level: riskLevel,
+                                category: currentCategory,
+                                rating: rating,
+                                position: index
+                            });
+                        }
+                    });
+                });
+            });
+            
+            return items;
+        }
+        
         // Function to save data to Supabase
         async function saveDataToSupabase() {
             try {
                 // Set flag that we're saving
                 isCurrentlySaving = true;
                 
-                // Clean up empty items before collecting data
-                cleanupEmptyItems();
-                
                 const itemsData = collectItemsData();
-                
-                console.log('Saving items to database:', itemsData);
                 
                 // Use fetch to save data to the server
                 const response = await fetch('/save_items', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                     body: JSON.stringify({
                         category: currentCategory,
                         items: itemsData
@@ -2093,7 +1778,7 @@
                 // Insert the item based on mouse position
                 if (mouseY < threshold) {
                     container.insertBefore(draggedItem, item);
-                } else {
+                    } else {
                     container.insertBefore(draggedItem, item.nextSibling);
                 }
                 
@@ -2134,9 +1819,9 @@
                     
                     // Don't allow dragging if any cell is being edited
                     if (currentlyEditingCell) {
-                        return;
-                    }
-                    
+                    return;
+                }
+                
                     // If container is empty or doesn't contain the dragged item
                     if (draggedItem && (!this.contains(draggedItem) || this.children.length === 0)) {
                         // Remove drag-over class from all containers
@@ -2167,27 +1852,16 @@
                         // Trigger auto-save to save the new order and risk level
                         triggerAutoSave();
                     }
-                });
             });
+        });
         }
 
         // Load saved items when page loads
         document.addEventListener('DOMContentLoaded', function() {
             const savedItems = JSON.parse('{{ saved_items_json | safe }}' || '[]');
             
-            console.log('Loading saved items:', savedItems);
-            
-            // Create a map to track items we've already added
-            const addedItems = new Set();
-            
             savedItems.forEach(item => {
                 if (item.category === currentCategory) {
-                    // Skip if we've already added this item
-                    if (item.id && addedItems.has(item.id)) {
-                        console.log('Skipping duplicate item:', item.id);
-                        return;
-                    }
-                    
                     // Find the correct container
                     const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === item.entity);
@@ -2225,9 +1899,9 @@
                                 // Prevent editing if cell is being edited by another user
                                 if (textElement.classList.contains('cell-editing-other')) {
                                     e.preventDefault();
-                    return;
-                }
-                
+                                    return;
+                                }
+                                
                                 if (textElement.getAttribute('contenteditable') === 'false') {
                                     textElement.setAttribute('contenteditable', 'true');
                                     textElement.focus();
@@ -2236,11 +1910,6 @@
                             
                             // Initialize drag and drop for this item
                             initializeDragForItem(itemElement);
-                            
-                            // Mark this item as added
-                            if (item.id) {
-                                addedItems.add(item.id);
-                            }
                         }
                     }
                 }
@@ -2270,7 +1939,7 @@
             if (localStorage.getItem('welcomeShown') !== 'true') {
                 // Show welcome modal
                 showWelcomeModal();
-            } else {
+                } else {
                 // Check if drag hint has been dismissed before
                 if (localStorage.getItem('dragHintShown') === 'true') {
                     // Show help button immediately
@@ -2513,177 +2182,6 @@
                 closeShortcutsModal();
             }
         });
-
-        // Function to show status message
-        function showStatusMessage(message, isSuccess) {
-            const statusMessage = document.getElementById('status-message');
-            statusMessage.textContent = message;
-            statusMessage.className = 'status-message';
-            
-            if (isSuccess) {
-                statusMessage.classList.add('success-message');
-            } else {
-                statusMessage.classList.add('error-message');
-            }
-            
-            statusMessage.style.display = 'block';
-            
-            // Hide message after 5 seconds
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 5000);
-        }
-
-        // Handle new item
-        function handleNewItem(payload) {
-            console.log('New item update:', payload);
-            
-            // If this is our own update, ignore it
-            if (payload.payload.userId === sessionUserId) {
-                return;
-            }
-            
-            const { entityId, riskLevel, itemId } = payload.payload;
-            
-            // Check if this item already exists (to avoid duplicates)
-            const existingItem = document.querySelector(`.item[data-item-id="${itemId}"]`);
-            if (existingItem) {
-                console.log('Item already exists, not creating duplicate');
-                return;
-            }
-            
-            // Also check if there's an item with the same entity and risk level that's empty
-            // This helps prevent duplicates when a user is still editing a newly created item
-            const emptyItems = document.querySelectorAll(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"]`);
-            for (const item of emptyItems) {
-                const textElement = item.querySelector('.item-text');
-                const ratingElement = item.querySelector('.item-rating');
-                
-                // If we find an empty item, use that instead of creating a new one
-                if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
-                    console.log('Found empty item, using it instead of creating a new one');
-                    item.setAttribute('data-item-id', itemId);
-                    return;
-                }
-            }
-            
-            // Find the correct container
-            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                .find(row => row.querySelector('.entity-title').textContent === entityId);
-            
-            if (entityRow) {
-                const riskColumn = entityRow.querySelector(
-                    riskLevel === 'No' ? '.no-risk' :
-                    riskLevel === 'At' ? '.at-risk' :
-                    '.high-risk'
-                );
-                
-                if (riskColumn) {
-                    const container = riskColumn.querySelector('.items-container');
-                    
-                    // Create new item
-                    const itemElement = document.createElement('div');
-                    itemElement.className = 'item';
-                    itemElement.setAttribute('draggable', 'true');
-                    itemElement.setAttribute('data-entity', entityId);
-                    itemElement.setAttribute('data-risk', riskLevel);
-                    itemElement.setAttribute('data-item-id', itemId);
-                    
-                    itemElement.innerHTML = `
-                        <i class="bi bi-grip-vertical drag-handle"></i>
-                        <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></div>
-                        <div class="item-rating" onclick="showRatingSelector(this)"></div>
-                        <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
-                    `;
-                    
-                    // Add to container at the top
-                    container.insertBefore(itemElement, container.firstChild);
-                    
-                    // Add click handler to make text editable when clicked
-                    const textElement = itemElement.querySelector('.item-text');
-                    textElement.addEventListener('click', function(e) {
-                        // Prevent editing if cell is being edited by another user
-                        if (textElement.classList.contains('cell-editing-other')) {
-                            e.preventDefault();
-                            return;
-                        }
-                        
-                        if (textElement.getAttribute('contenteditable') === 'false') {
-                            textElement.setAttribute('contenteditable', 'true');
-                            textElement.focus();
-                        }
-                    });
-                    
-                    // Initialize drag and drop for this item
-                    initializeDragForItem(itemElement);
-                    
-                    // Show a subtle notification that content was updated
-                    const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                    autoSaveIndicator.innerHTML = 'Nytt objekt tillagt';
-                    setTimeout(() => {
-                        autoSaveIndicator.innerHTML = '';
-                    }, 2000);
-                }
-            }
-        }
-
-        // Function to collect all items data
-        function collectItemsData() {
-            const items = [];
-            const processedIds = new Set(); // Track processed IDs to avoid duplicates
-            
-            // Get all entity rows
-            const entityRows = document.querySelectorAll('.entity-row');
-            
-            entityRows.forEach(entityRow => {
-                const entity = entityRow.querySelector('.entity-title').textContent;
-                
-                // Get all risk columns in this entity row
-                const riskColumns = entityRow.querySelectorAll('.risk-column');
-                
-                riskColumns.forEach(column => {
-                    // Determine risk level
-                    let riskLevel = 'Unknown';
-                    if (column.classList.contains('no-risk')) riskLevel = 'No';
-                    if (column.classList.contains('at-risk')) riskLevel = 'At';
-                    if (column.classList.contains('high-risk')) riskLevel = 'High';
-                    
-                    // Get all items in this column
-                    const itemElements = column.querySelectorAll('.item');
-                    
-                    itemElements.forEach((item, index) => {
-                        const text = item.querySelector('.item-text').textContent.trim();
-                        const rating = item.querySelector('.item-rating').textContent.trim();
-                        const itemId = item.getAttribute('data-item-id');
-                        
-                        // Skip if we've already processed this ID (avoid duplicates)
-                        if (processedIds.has(itemId)) {
-                            console.log('Skipping duplicate item ID:', itemId);
-                            return;
-                        }
-                        
-                        // Only include items that have either text or rating
-                        if (text || rating) {
-                            items.push({
-                                id: itemId,
-                                text: text,
-                                entity: entity,
-                                risk_level: riskLevel,
-                                category: currentCategory,
-                                rating: rating,
-                                position: index
-                            });
-                            
-                            // Mark this ID as processed
-                            processedIds.add(itemId);
-                        }
-                    });
-                });
-            });
-            
-            console.log('Collected items for saving:', items);
-            return items;
-        }
     </script>
 </body>
 </html>
