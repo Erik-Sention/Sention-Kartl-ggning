@@ -959,6 +959,13 @@
                         handleItemDeletion(payload);
                     }
                 )
+                .on(
+                    'broadcast',
+                    { event: 'new_item' },
+                    (payload) => {
+                        handleNewItem(payload);
+                    }
+                )
                 .subscribe();
                 
             // Set up a heartbeat to keep editing status alive
@@ -982,7 +989,34 @@
                 return;
             }
             
-            // Instead of reloading the entire page, fetch only the updated data
+            // If this is an INSERT event, we can handle it directly without fetching all items
+            if (payload.eventType === 'INSERT') {
+                const newItem = payload.new;
+                if (newItem && newItem.category === currentCategory) {
+                    addItemToDOM(newItem);
+                    return;
+                }
+            }
+            
+            // If this is an UPDATE event, we can handle it directly without fetching all items
+            if (payload.eventType === 'UPDATE') {
+                const updatedItem = payload.new;
+                if (updatedItem && updatedItem.category === currentCategory) {
+                    updateItemInDOM(updatedItem, payload.old);
+                    return;
+                }
+            }
+            
+            // If this is a DELETE event, we can handle it directly without fetching all items
+            if (payload.eventType === 'DELETE') {
+                const deletedItem = payload.old;
+                if (deletedItem && deletedItem.category === currentCategory) {
+                    removeItemFromDOM(deletedItem);
+                    return;
+                }
+            }
+            
+            // For other cases or if direct handling fails, fetch all items
             fetch(`/get_items?category=${currentCategory}`)
                 .then(response => response.json())
                 .then(data => {
@@ -1002,6 +1036,183 @@
                 .catch(error => {
                     console.error('Error fetching updated items:', error);
                 });
+        }
+        
+        // Add a new item to the DOM
+        function addItemToDOM(item) {
+            // Find the correct container
+            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                .find(row => row.querySelector('.entity-title').textContent === item.entity);
+            
+            if (entityRow) {
+                const riskColumn = entityRow.querySelector(
+                    item.risk_level === 'No' ? '.no-risk' :
+                    item.risk_level === 'At' ? '.at-risk' :
+                    '.high-risk'
+                );
+                
+                if (riskColumn) {
+                    const container = riskColumn.querySelector('.items-container');
+                    
+                    // Check if this item already exists
+                    const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+                    if (!existingItem) {
+                        // Create new item
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'item';
+                        itemElement.setAttribute('draggable', 'true');
+                        itemElement.setAttribute('data-entity', item.entity);
+                        itemElement.setAttribute('data-risk', item.risk_level);
+                        itemElement.setAttribute('data-item-id', item.id);
+                        
+                        // Use empty string if rating is null, undefined, or empty
+                        const ratingValue = item.rating || '';
+                        
+                        itemElement.innerHTML = `
+                            <i class="bi bi-grip-vertical drag-handle"></i>
+                            <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
+                            <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                            <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                        `;
+                        
+                        // Add to container at the correct position
+                        if (container.children.length > item.position) {
+                            container.insertBefore(itemElement, container.children[item.position]);
+                        } else {
+                            container.appendChild(itemElement);
+                        }
+                        
+                        // Add click handler to make text editable when clicked
+                        const textElement = itemElement.querySelector('.item-text');
+                        textElement.addEventListener('click', function(e) {
+                            // Prevent editing if cell is being edited by another user
+                            if (textElement.classList.contains('cell-editing-other')) {
+                                e.preventDefault();
+                                return;
+                            }
+                            
+                            if (textElement.getAttribute('contenteditable') === 'false') {
+                                textElement.setAttribute('contenteditable', 'true');
+                                textElement.focus();
+                            }
+                        });
+                        
+                        // Initialize drag and drop for this item
+                        initializeDragForItem(itemElement);
+                        
+                        // Show a subtle notification that content was updated
+                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                        autoSaveIndicator.innerHTML = 'Nytt objekt tillagt';
+                        setTimeout(() => {
+                            autoSaveIndicator.innerHTML = '';
+                        }, 2000);
+                    }
+                }
+            }
+        }
+        
+        // Update an existing item in the DOM
+        function updateItemInDOM(item, oldItem) {
+            // Find the item
+            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+            
+            // Skip if this item is currently being edited
+            if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
+                return;
+            }
+            
+            // If the item exists, update it
+            if (existingItem) {
+                // Check if the risk level has changed
+                if (oldItem.risk_level !== item.risk_level || oldItem.entity !== item.entity) {
+                    // Find the new container
+                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                        .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                    
+                    if (entityRow) {
+                        const riskColumn = entityRow.querySelector(
+                            item.risk_level === 'No' ? '.no-risk' :
+                            item.risk_level === 'At' ? '.at-risk' :
+                            '.high-risk'
+                        );
+                        
+                        if (riskColumn) {
+                            const container = riskColumn.querySelector('.items-container');
+                            
+                            // Remove from old container
+                            existingItem.remove();
+                            
+                            // Update attributes
+                            existingItem.setAttribute('data-entity', item.entity);
+                            existingItem.setAttribute('data-risk', item.risk_level);
+                            
+                            // Add to new container at the correct position
+                            if (container.children.length > item.position) {
+                                container.insertBefore(existingItem, container.children[item.position]);
+                            } else {
+                                container.appendChild(existingItem);
+                            }
+                            
+                            // Show a notification
+                            const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                            autoSaveIndicator.innerHTML = 'Objekt flyttat';
+                            setTimeout(() => {
+                                autoSaveIndicator.innerHTML = '';
+                            }, 2000);
+                        }
+                    }
+                } else if (oldItem.position !== item.position) {
+                    // Position has changed but risk level is the same
+                    const container = existingItem.parentNode;
+                    
+                    // Remove from current position
+                    existingItem.remove();
+                    
+                    // Add at new position
+                    if (container.children.length > item.position) {
+                        container.insertBefore(existingItem, container.children[item.position]);
+                    } else {
+                        container.appendChild(existingItem);
+                    }
+                }
+                
+                // Update content
+                const textElement = existingItem.querySelector('.item-text');
+                const ratingElement = existingItem.querySelector('.item-rating');
+                
+                // Only update if not being edited
+                if (!textElement.classList.contains('cell-editing') && !textElement.classList.contains('cell-editing-other')) {
+                    textElement.textContent = item.text;
+                }
+                
+                ratingElement.textContent = item.rating || '';
+            } else {
+                // If the item doesn't exist, add it
+                addItemToDOM(item);
+            }
+        }
+        
+        // Remove an item from the DOM
+        function removeItemFromDOM(item) {
+            // Find the item
+            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+            
+            // Skip if this item is currently being edited
+            if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
+                return;
+            }
+            
+            // If the item exists, remove it
+            if (existingItem) {
+                existingItem.remove();
+                
+                // Show a notification
+                const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                autoSaveIndicator.innerHTML = 'Objekt borttaget';
+                setTimeout(() => {
+                    autoSaveIndicator.innerHTML = '';
+                }, 2000);
+            }
         }
         
         // Function to update items in the DOM without reloading the page
@@ -1394,8 +1605,26 @@
             // Add drag and drop event listeners
             initializeDragForItem(item);
             
+            // Broadcast the new item to other users
+            broadcastNewItem(entity, riskLevel, itemId);
+            
             // Trigger auto-save
             triggerAutoSave();
+        }
+
+        // Broadcast new item
+        function broadcastNewItem(entity, riskLevel, itemId) {
+            // Broadcast new item
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'new_item',
+                payload: {
+                    userId: sessionUserId,
+                    entityId: entity,
+                    riskLevel: riskLevel,
+                    itemId: itemId
+                }
+            });
         }
 
         // Function to handle cell focus
@@ -2182,6 +2411,81 @@
                 closeShortcutsModal();
             }
         });
+
+        // Handle new item
+        function handleNewItem(payload) {
+            console.log('New item update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { entityId, riskLevel, itemId } = payload.payload;
+            
+            // Find the correct container
+            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                .find(row => row.querySelector('.entity-title').textContent === entityId);
+            
+            if (entityRow) {
+                const riskColumn = entityRow.querySelector(
+                    riskLevel === 'No' ? '.no-risk' :
+                    riskLevel === 'At' ? '.at-risk' :
+                    '.high-risk'
+                );
+                
+                if (riskColumn) {
+                    const container = riskColumn.querySelector('.items-container');
+                    
+                    // Check if this item already exists (to avoid duplicates)
+                    const existingItem = document.querySelector(`.item[data-item-id="${itemId}"]`);
+                    if (!existingItem) {
+                        // Create new item
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'item';
+                        itemElement.setAttribute('draggable', 'true');
+                        itemElement.setAttribute('data-entity', entityId);
+                        itemElement.setAttribute('data-risk', riskLevel);
+                        itemElement.setAttribute('data-item-id', itemId);
+                        
+                        itemElement.innerHTML = `
+                            <i class="bi bi-grip-vertical drag-handle"></i>
+                            <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></div>
+                            <div class="item-rating" onclick="showRatingSelector(this)"></div>
+                            <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                        `;
+                        
+                        // Add to container at the top
+                        container.insertBefore(itemElement, container.firstChild);
+                        
+                        // Add click handler to make text editable when clicked
+                        const textElement = itemElement.querySelector('.item-text');
+                        textElement.addEventListener('click', function(e) {
+                            // Prevent editing if cell is being edited by another user
+                            if (textElement.classList.contains('cell-editing-other')) {
+                                e.preventDefault();
+                                return;
+                            }
+                            
+                            if (textElement.getAttribute('contenteditable') === 'false') {
+                                textElement.setAttribute('contenteditable', 'true');
+                                textElement.focus();
+                            }
+                        });
+                        
+                        // Initialize drag and drop for this item
+                        initializeDragForItem(itemElement);
+                        
+                        // Show a subtle notification that content was updated
+                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                        autoSaveIndicator.innerHTML = 'Nytt objekt tillagt';
+                        setTimeout(() => {
+                            autoSaveIndicator.innerHTML = '';
+                        }, 2000);
+                    }
+                }
+            }
+        }
     </script>
 </body>
 </html>
