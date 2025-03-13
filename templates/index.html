@@ -11,1191 +11,619 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        function allowDrop(ev) {
-            ev.preventDefault();
+    <style>
+        /* Rating selector styles */
+        .rating-selector {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 10px;
+            z-index: 100;
+            display: none;
+        }
+        
+        .rating-option {
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .rating-option:hover {
+            background-color: #f8f9fa;
         }
 
-        function drag(ev) {
-            ev.dataTransfer.setData("text", ev.target.id);
+        /* Add button styles */
+        .add-item-btn {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            border-radius: 6px;
+            background-color: #F0EEEC;
+            color: #333;
+            border: none;
+            cursor: pointer;
+            margin: 10px auto;
         }
 
-        function drop(ev) {
-            ev.preventDefault();
-            var data = ev.dataTransfer.getData("text");
-            var draggedItem = document.getElementById(data);
-            
-            if (!draggedItem) {
-                console.error("Could not find dragged item with ID:", data);
-                return;
-            }
-            
-            var target = ev.target;
-            
-            // Find the closest risk column
-            while (target && !target.classList.contains('risk-column')) {
-                target = target.parentElement;
-            }
-            
-            if (target) {
-                // Get the entity and risk level
-                var entityRow = target.closest('.entity-row');
-                var entity = entityRow.querySelector('.entity-title').textContent.trim();
-                var riskText = target.querySelector('h3').textContent.trim();
-                
-                console.log("Drop target:", {
-                    entity: entity,
-                    riskText: riskText,
-                    currentCategory: currentCategory
-                });
-                
-                // Map the risk level text to the database format
-                var riskLevel;
-                if (riskText.includes('Ej risk')) riskLevel = 'No';
-                else if (riskText === '🟡 Risk') riskLevel = 'At';
-                else if (riskText.includes('Hög')) riskLevel = 'High';
-                
-                // Extract the text content from the dragged item
-                var itemText = draggedItem.querySelector('.resource-item-text')?.textContent.trim() || 
-                               draggedItem.textContent.replace('×', '').trim();
-                
-                // Create a new item instead of cloning to ensure proper structure
-                var newItem = document.createElement('div');
-                newItem.className = 'resource-item';
-                newItem.draggable = true;
-                newItem.setAttribute('ondragstart', 'drag(event)');
-                newItem.id = 'board_item_' + Math.random().toString(36).substr(2, 9);
-                newItem.innerHTML = `
-                    <div class="resource-item-text">${itemText}</div>
-                    <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                    <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-                
-                // Determine drop position based on mouse position
-                var dropY = ev.clientY;
-                var insertBefore = null;
-                var position = 0;
-                
-                // Get all existing items in the column
-                var existingItems = Array.from(target.querySelectorAll('.resource-item'));
-                
-                // Find the item to insert before based on Y position
-                for (var i = 0; i < existingItems.length; i++) {
-                    var rect = existingItems[i].getBoundingClientRect();
-                    var itemMiddle = rect.top + (rect.height / 2);
-                    
-                    if (dropY < itemMiddle) {
-                        insertBefore = existingItems[i];
-                        position = i;
-                        break;
-                    }
-                }
-                
-                // Insert at the determined position
-                if (insertBefore) {
-                    target.insertBefore(newItem, insertBefore);
-                } else {
-                    target.appendChild(newItem);
-                    position = existingItems.length;
-                }
-                
-                console.log("Calculated position:", position);
-                console.log("Saving item with category:", currentCategory);
-                
-                // Save to database with category
-                saveToDatabase(newItem, entity, riskLevel, position, itemText);
-                
-                // Add touch event listeners to the new item
-                if (typeof addTouchListenersToElement === 'function') {
-                    addTouchListenersToElement(newItem);
-                }
-            } else {
-                console.error("No valid drop target found");
-            }
+        .add-item-btn:hover {
+            background-color: #e0dedc;
         }
 
-        function saveToDatabase(item, entity, riskLevel, position, itemText) {
-            // If itemText is not provided, extract it from the item
-            if (!itemText) {
-                itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                           item.textContent.replace('×', '').trim();
-            }
-            
-            // If position is not provided or invalid, calculate it
-            if (typeof position !== 'number' || position < 0) {
-                const riskColumn = item.closest('.risk-column');
-                if (riskColumn) {
-                    const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    position = allItems.indexOf(item);
-                    console.log("Calculated position for save:", position);
-                } else {
-                    position = 0;
-                }
-            }
-            
-            const itemData = {
-                text: itemText,
-                entity: entity,
-                risk_level: riskLevel,
-                position: position,
-                category: currentCategory
-            };
-            
-            console.log("Saving to database:", itemData);
-            
-            fetch('/save_item', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(itemData)
-            })
-            .then(response => {
-                console.log("Save response status:", response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log("Save response data:", data);
-                if (data.status !== 'success') {
-                    console.error("Error saving item:", data.message);
-                    // If there was an error, remove the item from the board
-                    item.remove();
-                } else {
-                    console.log("Item saved successfully!");
-                }
-            })
-            .catch(error => {
-                console.error("Error saving item:", error);
-                // If there was an error, remove the item from the board
-                item.remove();
-            });
+        /* Item styles */
+        .item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 5px;
+            background-color: #F7F6F5;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
 
-        function deleteFromDatabase(item, entity, riskLevel) {
-            // Get the text content of the item
-            var itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                           item.textContent.replace('×', '').trim();
-            
-            const itemData = {
-                text: itemText,
-                entity: entity,
-                risk_level: riskLevel,
-                category: currentCategory
-            };
-            
-            console.log("Deleting from database:", itemData);
-            
-            fetch('/delete_item', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(itemData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Delete response:", data);
-                if (data.status !== 'success') {
-                    console.error("Error deleting item:", data.message);
-                    // If there was an error, add the item back to the board
-                    // This would be more complex in a real app
-                }
-            })
-            .catch(error => {
-                console.error("Error deleting item:", error);
-            });
+        .item:hover {
+            background-color: #F0EEEC;
+        }
+        
+        /* Drag handle styles */
+        .drag-handle {
+            cursor: move;
+            color: #6c757d;
+            padding: 5px;
+            margin-right: 5px;
+            opacity: 0.5;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .drag-handle:hover {
+            opacity: 1;
+            transform: scale(1.2);
+            color: #0d6efd;
+        }
+        
+        .drag-handle::after {
+            content: 'Dra för att ändra ordning';
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .drag-handle:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Dragging styles */
+        .item.dragging {
+            background-color: rgba(0, 123, 255, 0.1) !important;
+            opacity: 0.8;
+            cursor: move;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .item.drag-over {
+            position: relative;
+        }
+        
+        .item.drag-over::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: -2px;
+            height: 4px;
+            background-color: #0d6efd;
+            z-index: 100;
+            border-radius: 2px;
+            box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+            animation: pulse 1.5s infinite;
         }
 
-        function removeItem(element) {
-            var item = element.parentElement;
-            
-            // Check if this is a resource item (from the resources box)
-            if (item.closest('.resources-box')) {
-                // Extract the resource ID from the item ID
-                const resourceId = item.id.replace('resource_', '');
-                
-                // If it's a valid UUID, use removeResourceItem
-                if (resourceId && resourceId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
-                    removeResourceItem(element, resourceId);
-                    return;
-                }
-                
-                // Otherwise, just remove it from the DOM
-                item.remove();
-                return;
-            }
-            
-            // Handle items on the board (risk categories)
-            var entityRow = item.closest('.entity-row');
-            var riskColumn = item.closest('.risk-column');
-            
-            if (entityRow && riskColumn) {
-                var entity = entityRow.querySelector('.entity-title').textContent.trim();
-                var riskText = riskColumn.querySelector('h3').textContent.trim();
-                
-                // Map the risk level text to the database format
-                var riskLevel;
-                if (riskText.includes('Ej risk')) riskLevel = 'No';
-                else if (riskText === '🟡 Risk') riskLevel = 'At';
-                else if (riskText.includes('Hög')) riskLevel = 'High';
-                
-                // Get the text content of the item
-                var itemText = item.querySelector('.resource-item-text')?.textContent.trim() || 
-                               item.textContent.replace('×', '').trim();
-                
-                console.log("Removing item:", {
-                    text: itemText,
-                    entity: entity,
-                    riskLevel: riskLevel,
-                    category: currentCategory
-                });
-                
-                // Delete from database with category
-                deleteFromDatabase(item, entity, riskLevel);
-                
-                // Remove from DOM
-                item.remove();
-            }
+        /* Container drag-over styles */
+        .items-container.container-drag-over {
+            background-color: rgba(13, 110, 253, 0.05);
+            border: 2px dashed #0d6efd;
+            border-radius: 6px;
+            padding: 10px;
+            min-height: 60px;
+            animation: pulse 1.5s infinite;
         }
 
-        function addNewItem() {
-            var input = document.getElementById('newItemInput');
-            var text = input.value.trim();
-
-            if (text) {
-                // Add to Supabase
-                fetch('/add_resource', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ text: text })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Add resource response:", data);
-                    if (data.status === 'success') {
-                        console.log("Resource added successfully!");
-                        // Clear input
-                        input.value = '';
-                        
-                        // The new item will be added via the real-time subscription
-                    } else {
-                        console.error("Error adding resource:", data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error("Error adding resource:", error);
-                });
-            }
+        .item-text {
+            flex-grow: 1;
+            margin-right: 10px;
+            min-height: 20px;
         }
 
-        // Touch event handling
-        document.addEventListener('DOMContentLoaded', function() {
-            // Touch event handling for draggable items
-            let touchedItem = null;
-            
-            // Add touch event listeners to all resource items
-            function addTouchListeners() {
-                const items = document.querySelectorAll('.resource-item');
-                items.forEach(item => {
-                    item.addEventListener('touchstart', handleTouchStart, {passive: false});
-                    item.addEventListener('touchmove', handleTouchMove, {passive: false});
-                    item.addEventListener('touchend', handleTouchEnd, {passive: false});
-                });
+        .item-text[contenteditable="true"] {
+            padding: 2px;
+            outline: none;
+        }
+
+        .item-rating {
+            padding: 2px 5px;
+            color: #666;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        /* Add placeholder for empty rating */
+        .item-rating:empty::before {
+            content: "Klicka för betyg";
+            font-style: italic;
+            color: #aaa;
+            font-size: 0.85em;
+        }
+
+        /* Delete button styles */
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .item:hover .delete-btn {
+            opacity: 1;
+        }
+        
+        .delete-btn:hover {
+            color: #bd2130;
+        }
+
+        /* Edit mode styles */
+        .editing {
+            background-color: #fff;
+            box-shadow: 0 0 0 2px #007bff;
+        }
+
+        .editing .delete-btn {
+            opacity: 1;
+        }
+
+        /* Entity row styles */
+        .entity-row {
+            margin: 20px;
+            width: calc(100% - 40px); /* Full width minus margins */
+        }
+
+        .risk-columns {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .risk-column {
+            flex: 1;
+            border-radius: 8px;
+            padding: 15px;
+            min-width: 0; /* Prevents flex items from overflowing */
+        }
+
+        .risk-column.no-risk {
+            background-color: rgba(40, 167, 69, 0.1); /* Light green */
+        }
+
+        .risk-column.at-risk {
+            background-color: rgba(255, 193, 7, 0.1); /* Light yellow */
+        }
+
+        .risk-column.high-risk {
+            background-color: rgba(220, 53, 69, 0.1); /* Light red */
+        }
+
+        .items-container {
+            width: 100%;
+        }
+
+        /* Cell being edited styles */
+        .cell-editing {
+            background-color: rgba(255, 255, 0, 0.1) !important;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+            position: relative;
+        }
+
+        .cell-editing::after {
+            content: "Redigeras...";
+            position: absolute;
+            top: -20px;
+            left: 0;
+            background-color: rgba(0, 123, 255, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        /* Status message styles */
+        .status-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Auto-save indicator */
+        .auto-save-indicator {
+            display: inline-block;
+            margin: 15px;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        /* Saving animation */
+        .saving {
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        /* First-time user hint */
+        .drag-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #666;
+            z-index: 1000;
+            animation: slideIn 0.5s ease-out;
+            max-width: 450px;
+            width: 450px;
+            min-height: 60px;
+            height: 60px;
+        }
+        
+        .drag-hint i {
+            font-size: 1.2rem;
+            color: #0d6efd;
+        }
+        
+        .drag-hint-content {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        
+        #drag-hint-text {
+            transition: opacity 0.3s ease;
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            line-height: 1.4;
+            flex-grow: 1;
+        }
+        
+        .tip-navigation {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            white-space: nowrap;
+        }
+        
+        .tip-nav-btn {
+            background: none;
+            border: none;
+            color: #0d6efd;
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .tip-nav-btn:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: scale(1.1);
+        }
+        
+        .tip-counter {
+            font-size: 0.8rem;
+            color: #999;
+        }
+        
+        .drag-hint-close {
+            margin-left: 10px;
+            padding: 5px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+        }
+        
+        .drag-hint-close:hover {
+            color: #666;
+        }
+        
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close-modal:hover {
+            color: #333;
+        }
+        
+        .shortcuts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .shortcuts-table tr {
+            border-bottom: 1px solid #eee;
+        }
+        
+        .shortcuts-table tr:last-child {
+            border-bottom: none;
+        }
+        
+        .shortcuts-table td {
+            padding: 8px 5px;
+        }
+        
+        .shortcuts-table td:first-child {
+            width: 40%;
+            text-align: right;
+            padding-right: 15px;
+        }
+        
+        kbd {
+            background-color: #f7f7f7;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+            color: #333;
+            display: inline-block;
+            font-size: 0.85em;
+            font-family: monospace;
+            line-height: 1;
+            padding: 2px 5px;
+            margin: 0 2px;
+        }
+        
+        /* Help button styles */
+        .help-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            margin-left: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .help-btn:hover {
+            background-color: #5a6268;
+            color: white;
+        }
+        
+        .help-btn i {
+            font-size: 1.1rem;
+        }
+        
+        /* Welcome modal styles */
+        .welcome-content {
+            max-width: 600px;
+            padding: 25px;
+        }
+        
+        .welcome-steps {
+            margin: 20px 0;
+        }
+        
+        .welcome-step {
+            display: flex;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+        
+        .step-number {
+            background-color: #0d6efd;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex-grow: 1;
+        }
+        
+        .step-content h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        
+        .step-content p {
+            margin: 0;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .welcome-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .welcome-btn {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .welcome-btn:hover {
+            background-color: #0b5ed7;
+        }
+        
+        .dont-show-again {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #666;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        /* Help floating button */
+        .help-floating-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 999;
+            transition: all 0.2s;
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .help-floating-btn.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .help-floating-btn:hover {
+            transform: scale(1.1);
+            background-color: #0b5ed7;
+        }
+        
+        .help-floating-btn i {
+            font-size: 1.2rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
             }
-            
-            function handleTouchStart(e) {
-                e.preventDefault();
-                touchedItem = this;
-                // Add a visual indicator that the item is being dragged
-                this.style.opacity = '0.7';
+            to {
+                transform: translateX(0);
+                opacity: 1;
             }
-            
-            function handleTouchMove(e) {
-                e.preventDefault();
-                if (!touchedItem) return;
-                
-                // Get touch position
-                const touch = e.touches[0];
-                const x = touch.clientX;
-                const y = touch.clientY;
-                
-                // Create a visual indicator that follows the touch
-                let indicator = document.getElementById('touch-indicator');
-                if (!indicator) {
-                    indicator = document.createElement('div');
-                    indicator.id = 'touch-indicator';
-                    indicator.style.position = 'fixed';
-                    indicator.style.zIndex = '9999';
-                    indicator.style.pointerEvents = 'none';
-                    indicator.style.background = 'rgba(0,0,0,0.2)';
-                    indicator.style.padding = '10px';
-                    indicator.style.borderRadius = '5px';
-                    indicator.style.width = '100px';
-                    indicator.style.textAlign = 'center';
-                    indicator.textContent = touchedItem.textContent.replace('×', '').trim();
-                    document.body.appendChild(indicator);
-                }
-                
-                indicator.style.left = (x - 50) + 'px';
-                indicator.style.top = (y - 25) + 'px';
-            }
-            
-            function handleTouchEnd(e) {
-                e.preventDefault();
-                
-                if (!touchedItem) return;
-                
-                // Reset visual indicator
-                touchedItem.style.opacity = '1';
-                
-                // Get touch position
-                const touchX = e.changedTouches[0].clientX;
-                const touchY = e.changedTouches[0].clientY;
-                
-                // Find element at touch position
-                const elementsAtPoint = document.elementsFromPoint(touchX, touchY);
-                
-                // Find the closest risk column
-                const riskColumn = elementsAtPoint.find(el => el.classList.contains('risk-column'));
-                
-                if (riskColumn) {
-                    // Get the entity and risk level
-                    const entityRow = riskColumn.closest('.entity-row');
-                    const entity = entityRow.querySelector('.entity-title').textContent.trim();
-                    const riskText = riskColumn.querySelector('h3').textContent.trim();
-                    
-                    console.log("Touch drop target:", {
-                        entity: entity,
-                        riskText: riskText,
-                        currentCategory: currentCategory
-                    });
-                    
-                    // Map the risk level text to the database format
-                    let riskLevel;
-                    if (riskText.includes('Ej risk')) riskLevel = 'No';
-                    else if (riskText === '🟡 Risk') riskLevel = 'At';
-                    else if (riskText.includes('Hög')) riskLevel = 'High';
-                    
-                    // Extract the text content from the touched item
-                    const itemText = touchedItem.querySelector('.resource-item-text')?.textContent.trim() || 
-                                     touchedItem.textContent.replace('×', '').trim();
-                    
-                    // Create a new item instead of cloning to ensure proper structure
-                    const newItem = document.createElement('div');
-                    newItem.className = 'resource-item';
-                    newItem.draggable = true;
-                    newItem.setAttribute('ondragstart', 'drag(event)');
-                    newItem.id = 'board_item_' + Math.random().toString(36).substr(2, 9);
-                    newItem.innerHTML = `
-                        <div class="resource-item-text">${itemText}</div>
-                        <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                        <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-                    
-                    // Determine drop position based on touch position
-                    let insertBefore = null;
-                    let position = 0;
-                    
-                    // Get all existing items in the column
-                    const existingItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    
-                    // Find the item to insert before based on Y position
-                    for (let i = 0; i < existingItems.length; i++) {
-                        const rect = existingItems[i].getBoundingClientRect();
-                        const itemMiddle = rect.top + (rect.height / 2);
-                        
-                        if (touchY < itemMiddle) {
-                            insertBefore = existingItems[i];
-                            position = i;
-                            break;
-                        }
-                    }
-                    
-                    // Insert at the determined position
-                    if (insertBefore) {
-                        riskColumn.insertBefore(newItem, insertBefore);
-                    } else {
-                        riskColumn.appendChild(newItem);
-                        position = existingItems.length;
-                    }
-                    
-                    console.log("Touch calculated position:", position);
-                    console.log("Saving touch item with category:", currentCategory);
-                    
-                    // Save to database with category
-                    saveToDatabase(newItem, entity, riskLevel, position, itemText);
-                    
-                    // Add touch event listeners to the new item
-                    addTouchListenersToElement(newItem);
-                }
-                
-                // Remove the touch indicator
-                const indicator = document.getElementById('touch-indicator');
-                if (indicator) {
-                    indicator.remove();
-                }
-                
-                touchedItem = null;
-            }
-            
-            // Initialize touch listeners
-            addTouchListeners();
-            
-            // Make the function globally available
-            window.addTouchListenersToElement = function(element) {
-                element.addEventListener('touchstart', handleTouchStart, {passive: false});
-                element.addEventListener('touchmove', handleTouchMove, {passive: false});
-                element.addEventListener('touchend', handleTouchEnd, {passive: false});
-            };
-            
-            // Add a mutation observer to add touch listeners to new items
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        addTouchListeners();
-                    }
-                });
-            });
-            
-            observer.observe(document.body, { childList: true, subtree: true });
-        });
-    </script>
+        }
+    </style>
 </head>
 <body class="luxury-dashboard">
-    <!-- Initialize Supabase client -->
-    <script>
-        // Initialize Supabase client
-        const supabaseUrl = '{{ supabase_url }}';
-        const supabaseKey = '{{ supabase_key }}';
-        console.log("Supabase URL:", supabaseUrl ? "Defined" : "Undefined");
-        console.log("Supabase Key:", supabaseKey ? "Defined" : "Undefined");
-        
-        let supabaseClient;
-        try {
-            // Access the global supabase object from the imported script
-            supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-            console.log("Supabase client created successfully");
-        } catch (error) {
-            console.error("Error creating Supabase client:", error);
-        }
-        
-        // Initialize variables from Flask
-        const currentCategory = "{{ current_category }}";
-        const savedItems = JSON.parse('{{ saved_items_json | safe }}' || '[]');
-        const currentUserId = "{{ session.user_id }}";
-        
-        console.log("Current Category:", currentCategory);
-        console.log("Current User ID:", currentUserId);
-        console.log("Saved Items count:", savedItems.length);
-        
-        // Set up real-time subscription for items
-        const setupRealtimeSubscription = () => {
-            console.log("Setting up real-time subscription for items...");
-            
-            if (!supabaseClient) {
-                console.error("Supabase client not initialized, can't set up subscription");
-                return null;
-            }
-            
-            console.log("Creating channel for category:", currentCategory);
-            
-            // Subscribe to changes in the items table for the current category
-            const subscription = supabaseClient
-                .channel('items-changes')
-                .on('postgres_changes', {
-                    event: '*',  // Listen for all events (INSERT, UPDATE, DELETE)
-                    schema: 'public',
-                    table: 'items',
-                    filter: `category=eq.${currentCategory}`
-                }, (payload) => {
-                    console.log("Real-time event received:", payload);
-                    handleRealtimeChange(payload);
-                })
-                .subscribe((status) => {
-                    console.log("Subscription status:", status);
-                    
-                    if (status === 'SUBSCRIBED') {
-                        console.log("Successfully subscribed to real-time changes!");
-                    } else if (status === 'CHANNEL_ERROR') {
-                        console.error("Error subscribing to real-time changes");
-                    }
-                    
-                    // Initialize touch listeners after subscription is set up
-                    setTimeout(addTouchListeners, 500);
-                });
-                
-            return subscription;
-        };
-        
-        // Handle real-time changes
-        const handleRealtimeChange = (payload) => {
-            console.log("Real-time change received:", payload);
-            
-            const { eventType, new: newItem, old: oldItem } = payload;
-            
-            // Only process items for the current category
-            if (newItem && newItem.category !== currentCategory) {
-                console.log('Ignoring item from different category:', newItem.category);
-                return;
-            }
-            
-            switch (eventType) {
-                case 'INSERT':
-                    // Don't add items that were just added by this user (to avoid duplicates)
-                    if (newItem.user_id === currentUserId) {
-                        console.log('Ignoring own insert');
-                        return;
-                    }
-                    addItemToBoard(newItem);
-                    break;
-                    
-                case 'DELETE':
-                    removeItemFromBoard(oldItem);
-                    break;
-                    
-                case 'UPDATE':
-                    // Update the item in place instead of removing and re-adding
-                    updateItemInBoard(newItem, oldItem);
-                    break;
-            }
-        };
-        
-        // Update item in the board without changing its position
-        const updateItemInBoard = (newItem, oldItem) => {
-            console.log("Updating item in board:", newItem);
-            
-            // Map risk levels to the exact text in your columns
-            const riskMap = {
-                'No': '🟢 Ej risk',
-                'At': '🟡 Risk',
-                'High': '🔴 Hög risk'
-            };
-            
-            // Find the entity row
-            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                .find(row => row.querySelector('.entity-title').textContent.trim() === newItem.entity);
-            
-            if (entityRow) {
-                // Find the risk column
-                const riskColumn = Array.from(entityRow.querySelectorAll('.risk-column'))
-                    .find(col => col.querySelector('h3').textContent.trim() === riskMap[newItem.risk_level]);
-                
-                if (riskColumn) {
-                    // Try to find an existing item with the same text as the old item
-                    const existingItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    const existingItem = existingItems.find(el => {
-                        const itemText = el.querySelector('.resource-item-text')?.textContent.trim() || 
-                                        el.textContent.replace('×', '').trim();
-                        return itemText === oldItem.text;
-                    });
-                    
-                    if (existingItem) {
-                        // Update the existing item's text
-                        const textContainer = existingItem.querySelector('.resource-item-text');
-                        if (textContainer) {
-                            textContainer.textContent = newItem.text;
-                            console.log("Updated item text in place:", newItem.text);
-                            return; // Exit early - we've updated the text in place
-                        } else {
-                            // If there's no text container, update the whole item
-                            existingItem.innerHTML = `
-                                <div class="resource-item-text">${newItem.text}</div>
-                                <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                                <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-                            
-                            // Add touch event listeners to the updated item
-                            if (typeof addTouchListenersToElement === 'function') {
-                                addTouchListenersToElement(existingItem);
-                            }
-                            console.log("Updated entire item in place:", newItem.text);
-                            return; // Exit early - we've updated the item in place
-                        }
-                    }
-                    
-                    // If we're here, we couldn't find the item by text, try to find it by position
-                    if (typeof newItem.position === 'number') {
-                        // Get all items in this risk column
-                        const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                        
-                        // Check if there's an item at this position
-                        if (newItem.position >= 0 && newItem.position < allItems.length) {
-                            const itemAtPosition = allItems[newItem.position];
-                            
-                            // Update the item at this position
-                            const textContainer = itemAtPosition.querySelector('.resource-item-text');
-                            if (textContainer) {
-                                textContainer.textContent = newItem.text;
-                                console.log("Updated item at position", newItem.position, ":", newItem.text);
-                                return; // Exit early - we've updated the item at the position
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // If we couldn't find the item to update, fall back to remove and add
-            console.log("Could not find item to update in place, falling back to remove and add");
-            removeItemFromBoard(oldItem);
-            addItemToBoard(newItem);
-        };
-        
-        // Add item to the board
-        const addItemToBoard = (item) => {
-            console.log('Adding item to board:', item);
-            
-            // Map risk levels to the exact text in your columns
-            const riskMap = {
-                'No': '🟢 Ej risk',
-                'At': '🟡 Risk',
-                'High': '🔴 Hög risk'
-            };
-            
-            // Skip items with Unknown risk level
-            if (item.risk_level === 'Unknown') {
-                console.log('Skipping item with Unknown risk level:', item.text);
-                return;
-            }
-            
-            // Find the entity row
-            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                .find(row => row.querySelector('.entity-title').textContent.trim() === item.entity);
-            
-            console.log('Found entity row:', entityRow?.querySelector('.entity-title')?.textContent);
-            
-            if (entityRow) {
-                // Find the risk column using the mapped risk level
-                const riskColumn = Array.from(entityRow.querySelectorAll('.risk-column'))
-                    .find(col => col.querySelector('h3').textContent.trim() === riskMap[item.risk_level]);
-                
-                console.log('Found risk column:', riskColumn?.querySelector('h3')?.textContent);
-                
-                if (riskColumn) {
-                    // Check if item already exists (to avoid duplicates)
-                    const existingItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    const itemExists = existingItems.some(el => 
-                        el.textContent.replace('×', '').trim() === item.text);
-                    
-                    if (!itemExists) {
-                        // Create new item
-                        const newItem = document.createElement('div');
-                        newItem.className = 'resource-item';
-                        newItem.draggable = true;
-                        newItem.setAttribute('ondragstart', 'drag(event)');
-                        newItem.id = `realtime_${Math.random().toString(36).substr(2, 9)}`;
-                        newItem.innerHTML = `
-                            <div class="resource-item-text">${item.text}</div>
-                            <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                            <button class="remove-btn" onclick="removeItem(this)">×</button>`;
-                        
-                        // Insert at the correct position if specified
-                        if (typeof item.position === 'number' && item.position >= 0) {
-                            console.log('Inserting item at position:', item.position);
-                            
-                            // Get all existing items
-                            const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                            
-                            if (item.position < allItems.length) {
-                                // Insert before the item at the specified position
-                                riskColumn.insertBefore(newItem, allItems[item.position]);
-                            } else {
-                                // If position is beyond the current items, just append
-                                riskColumn.appendChild(newItem);
-                            }
-                        } else {
-                            // If no position specified, just append
-                            riskColumn.appendChild(newItem);
-                        }
-                        
-                        console.log('Added item:', item.text);
-                        
-                        // Add touch event listeners to the new item
-                        if (typeof addTouchListenersToElement === 'function') {
-                            addTouchListenersToElement(newItem);
-                        }
-                    }
-                }
-            }
-        };
-        
-        // Remove item from the board
-        const removeItemFromBoard = (item) => {
-            console.log('Removing item from board:', item);
-            
-            // Skip items with Unknown risk level
-            if (item.risk_level === 'Unknown') {
-                console.log('Skipping removal of item with Unknown risk level:', item.text);
-                return;
-            }
-            
-            // Map risk levels to the exact text in your columns
-            const riskMap = {
-                'No': '🟢 Ej risk',
-                'At': '🟡 Risk',
-                'High': '🔴 Hög risk'
-            };
-            
-            // Find the entity row
-            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                .find(row => row.querySelector('.entity-title').textContent.trim() === item.entity);
-            
-            if (entityRow) {
-                // Find the risk column
-                const riskColumn = Array.from(entityRow.querySelectorAll('.risk-column'))
-                    .find(col => col.querySelector('h3').textContent.trim() === riskMap[item.risk_level]);
-                
-                if (riskColumn) {
-                    // Find the item by text content
-                    const itemElements = Array.from(riskColumn.querySelectorAll('.resource-item'));
-                    const itemToRemove = itemElements.find(el => 
-                        el.textContent.replace('×', '').trim() === item.text);
-                    
-                    if (itemToRemove) {
-                        itemToRemove.remove();
-                        console.log('Removed item:', item.text);
-                    }
-                }
-            }
-        };
-    
-        // Set up real-time subscription for resources
-        const setupResourcesSubscription = () => {
-            console.log("Setting up real-time subscription for resources...");
-            
-            if (!supabaseClient) {
-                console.error("Supabase client not initialized, can't set up subscription");
-                return null;
-            }
-            
-            // Subscribe to changes in the resources table
-            const subscription = supabaseClient
-                .channel('resources-changes')
-                .on('postgres_changes', {
-                    event: '*',  // Listen for all events (INSERT, UPDATE, DELETE)
-                    schema: 'public',
-                    table: 'resources'
-                }, (payload) => {
-                    console.log("Resources real-time event received:", payload);
-                    handleResourcesRealtimeChange(payload);
-                })
-                .subscribe((status) => {
-                    console.log("Resources subscription status:", status);
-                });
-                
-            return subscription;
-        };
-        
-        // Handle real-time changes for resources
-        const handleResourcesRealtimeChange = (payload) => {
-            console.log("Resources real-time change received:", payload);
-            
-            const { eventType, new: newResource, old: oldResource } = payload;
-            
-            switch (eventType) {
-                case 'INSERT':
-                    addResourceToList(newResource);
-                    break;
-                    
-                case 'DELETE':
-                    removeResourceFromList(oldResource.id);
-                    break;
-                    
-                case 'UPDATE':
-                    // Update the resource in place instead of removing and re-adding
-                    updateResourceInList(newResource);
-                    break;
-            }
-        };
-        
-        // Add resource to the list
-        const addResourceToList = (resource) => {
-            console.log("Adding resource to list:", resource);
-            
-            const container = document.querySelector('.resources-box');
-            
-            // Check if resource already exists
-            const existingResource = document.getElementById(`resource_${resource.id}`);
-            if (existingResource) {
-                console.log("Resource already exists, updating:", resource.id);
-                updateResourceContent(existingResource, resource);
-                return;
-            }
-            
-            // Create new resource item
-            const newItem = document.createElement('div');
-            newItem.id = `resource_${resource.id}`;
-            newItem.className = 'resource-item';
-            newItem.draggable = true;
-            newItem.setAttribute('ondragstart', 'drag(event)');
-            updateResourceContent(newItem, resource);
-            
-            // Add to container
-            container.appendChild(newItem);
-            
-            // Add touch event listeners to the new item
-            if (typeof addTouchListenersToElement === 'function') {
-                addTouchListenersToElement(newItem);
-            }
-        };
-        
-        // Update resource in the list without changing its position
-        const updateResourceInList = (resource) => {
-            console.log("Updating resource in list:", resource);
-            
-            const existingResource = document.getElementById(`resource_${resource.id}`);
-            if (existingResource) {
-                updateResourceContent(existingResource, resource);
-            } else {
-                // If the resource doesn't exist (shouldn't happen), add it
-                addResourceToList(resource);
-            }
-        };
-        
-        // Helper function to update resource content
-        const updateResourceContent = (element, resource) => {
-            element.innerHTML = `
-                <div class="resource-item-text">${resource.text}</div>
-                <button class="edit-btn" onclick="editResourceItem(this, '${resource.id}')"><i class="bi bi-pencil"></i></button>
-                <button class="remove-btn" onclick="removeResourceItem(this, '${resource.id}')">×</button>
-            `;
-        };
-        
-        // Remove resource from the list
-        const removeResourceFromList = (resourceId) => {
-            console.log("Removing resource from list:", resourceId);
-            
-            const item = document.getElementById(`resource_${resourceId}`);
-            if (item) {
-                item.remove();
-            }
-        };
-        
-        // Remove resource item (button click handler)
-        function removeResourceItem(element, resourceId) {
-            console.log("Removing resource item:", resourceId);
-            
-            // Delete from Supabase
-            fetch('/delete_resource', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ id: resourceId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Delete resource response:", data);
-                if (data.status === 'success') {
-                    console.log("Resource deleted successfully!");
-                    // The item will be removed via the real-time subscription
-                } else {
-                    console.error("Error deleting resource:", data.message);
-                }
-            })
-            .catch(error => {
-                console.error("Error deleting resource:", error);
-            });
-        }
-        
-        // Load resources when the page loads
-        function loadResources() {
-            console.log('Loading resources...');
-            
-            fetch('/get_resources')
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Get resources response:", data);
-                    if (data.status === 'success') {
-                        // Clear existing resources
-                        const container = document.querySelector('.resources-box');
-                        // Keep the heading
-                        const heading = container.querySelector('h3');
-                        container.innerHTML = '';
-                        container.appendChild(heading);
-                        
-                        // Add resources
-                        data.resources.forEach(resource => {
-                            addResourceToList(resource);
-                        });
-                    } else {
-                        console.error("Error getting resources:", data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error("Error getting resources:", error);
-                });
-        }
-        
-        // Load saved items when the page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Loading saved items...');
-            
-            // Load initial items
-            savedItems.forEach(item => {
-                console.log('Processing item:', item);
-                
-                // Only process items for the current category
-                if (item.category !== currentCategory) {
-                    console.log('Skipping item from different category:', item.category);
-                    return;
-                }
-                
-                // Add item to board
-                addItemToBoard(item);
-            });
-            
-            // Set up real-time subscription for items
-            const itemsSubscription = setupRealtimeSubscription();
-            
-            // Load resources
-            loadResources();
-            
-            // Set up real-time subscription for resources
-            const resourcesSubscription = setupResourcesSubscription();
-            
-            // Clean up subscriptions when page unloads
-            window.addEventListener('beforeunload', () => {
-                console.log('Cleaning up subscriptions...');
-                if (itemsSubscription) itemsSubscription.unsubscribe();
-                if (resourcesSubscription) resourcesSubscription.unsubscribe();
-            });
-        });
-
-        // Add these new functions for editing resources and items
-        function editResourceItem(element, resourceId) {
-            const item = element.closest('.resource-item');
-            const textContainer = item.querySelector('.resource-item-text');
-            const currentText = textContainer.textContent.trim();
-            
-            // Create an input field for editing
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentText;
-            input.className = 'edit-input';
-            
-            // Create save button
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'save-edit-btn';
-            saveBtn.innerHTML = '<i class="bi bi-check"></i>';
-            saveBtn.onclick = function() {
-                saveResourceEdit(resourceId, input.value, item);
-            };
-            
-            // Create cancel button
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'cancel-edit-btn';
-            cancelBtn.innerHTML = '<i class="bi bi-x"></i>';
-            cancelBtn.onclick = function() {
-                cancelEdit(item, currentText);
-            };
-            
-            // Clear the item and add the input field and buttons
-            item.innerHTML = '';
-            item.appendChild(input);
-            item.appendChild(saveBtn);
-            item.appendChild(cancelBtn);
-            
-            // Focus the input field
-            input.focus();
-            
-            // Disable dragging during edit
-            item.draggable = false;
-        }
-        
-        function saveResourceEdit(resourceId, newText, item) {
-            // Save to database
-            fetch('/update_resource', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    id: resourceId,
-                    text: newText
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Update resource response:", data);
-                if (data.status === 'success') {
-                    console.log("Resource updated successfully!");
-                    // The item will be updated via the real-time subscription
-                } else {
-                    console.error("Error updating resource:", data.message);
-                    // Restore the original text
-                    cancelEdit(item, newText);
-                }
-            })
-            .catch(error => {
-                console.error("Error updating resource:", error);
-                // Restore the original text
-                cancelEdit(item, newText);
-            });
-        }
-        
-        function editItem(element) {
-            const item = element.closest('.resource-item');
-            const textContainer = item.querySelector('.resource-item-text');
-            const currentText = textContainer ? textContainer.textContent.trim() : item.textContent.replace('×', '').trim();
-            
-            // Get entity and risk level for later use
-            const entityRow = item.closest('.entity-row');
-            const riskColumn = item.closest('.risk-column');
-            const entity = entityRow.querySelector('.entity-title').textContent.trim();
-            const riskText = riskColumn.querySelector('h3').textContent.trim();
-            
-            // Map the risk level text to the database format
-            let riskLevel;
-            if (riskText.includes('Ej risk')) riskLevel = 'No';
-            else if (riskText.includes('Risk') && !riskText.includes('Hög')) riskLevel = 'At';
-            else if (riskText.includes('Hög')) riskLevel = 'High';
-            else riskLevel = 'Unknown';
-            
-            // Get all resource items in this risk column
-            const allItems = Array.from(riskColumn.querySelectorAll('.resource-item'));
-            
-            // Store the item's position in the DOM for later use
-            // We need to filter to only count resource-item elements
-            const itemPosition = allItems.indexOf(item);
-            console.log("Editing item at position:", itemPosition);
-            
-            // Store position and other data as attributes
-            item.dataset.position = itemPosition;
-            item.dataset.entity = entity;
-            item.dataset.riskLevel = riskLevel;
-            item.dataset.originalText = currentText;
-            
-            // Create an input field for editing
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentText;
-            input.className = 'edit-input';
-            
-            // Create save button
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'save-edit-btn';
-            saveBtn.innerHTML = '<i class="bi bi-check"></i>';
-            saveBtn.onclick = function() {
-                saveItemEdit(input.value, currentText, entity, riskLevel, item);
-            };
-            
-            // Create cancel button
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'cancel-edit-btn';
-            cancelBtn.innerHTML = '<i class="bi bi-x"></i>';
-            cancelBtn.onclick = function() {
-                cancelEdit(item, currentText);
-            };
-            
-            // Clear the item and add the input field and buttons
-            item.innerHTML = '';
-            item.appendChild(input);
-            item.appendChild(saveBtn);
-            item.appendChild(cancelBtn);
-            
-            // Focus the input field
-            input.focus();
-            
-            // Disable dragging during edit
-            item.draggable = false;
-        }
-        
-        function saveItemEdit(newText, oldText, entity, riskLevel, item) {
-            // Get the stored position from the item's dataset
-            const position = parseInt(item.dataset.position);
-            console.log("Saving edited item with position:", position);
-            
-            // First delete the old item
-            const deleteData = {
-                text: oldText,
-                entity: entity,
-                risk_level: riskLevel,
-                category: currentCategory
-            };
-            
-            fetch('/delete_item', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(deleteData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Then save the new item with the same position
-                    const saveData = {
-                        text: newText,
-                        entity: entity,
-                        risk_level: riskLevel,
-                        position: position, // Use the stored position
-                        category: currentCategory
-                    };
-                    
-                    fetch('/save_item', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(saveData)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status !== 'success') {
-                            console.error("Error saving edited item:", data.message);
-                            // Restore the original text
-                            cancelEdit(item, oldText);
-                        } else {
-                            // Manually restore the item appearance since the realtime update might be delayed
-                            cancelEdit(item, newText);
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error saving edited item:", error);
-                        // Restore the original text
-                        cancelEdit(item, oldText);
-                    });
-                } else {
-                    console.error("Error deleting old item:", data.message);
-                    // Restore the original text
-                    cancelEdit(item, oldText);
-                }
-            })
-            .catch(error => {
-                console.error("Error deleting old item:", error);
-                // Restore the original text
-                cancelEdit(item, oldText);
-            });
-        }
-        
-        function cancelEdit(item, originalText) {
-            // For resources
-            if (item.id.startsWith('resource_')) {
-                const resourceId = item.id.replace('resource_', '');
-                item.innerHTML = `
-                    <div class="resource-item-text">${originalText}</div>
-                    <button class="edit-btn" onclick="editResourceItem(this, '${resourceId}')"><i class="bi bi-pencil"></i></button>
-                    <button class="remove-btn" onclick="removeResourceItem(this, '${resourceId}')">×</button>
-                `;
-            } 
-            // For board items
-            else {
-                item.innerHTML = `
-                    <div class="resource-item-text">${originalText}</div>
-                    <button class="edit-btn" onclick="editItem(this)"><i class="bi bi-pencil"></i></button>
-                    <button class="remove-btn" onclick="removeItem(this)">×</button>
-                `;
-            }
-            
-            // Re-enable dragging
-            item.draggable = true;
-            
-            // Add touch event listeners back to the item
-            if (typeof addTouchListenersToElement === 'function') {
-                addTouchListenersToElement(item);
-            }
-        }
-    </script>
-    
     <div class="header">
         <h2>SENTION Kartläggning</h2>
         <div class="navbar-links">
@@ -1215,28 +643,25 @@
             <a href="{{ url_for('logout') }}" class="logout-btn"><i class="bi bi-box-arrow-right"></i> Logga ut</a>
         </div>
     </div>
-    <div class="resources-box">
-        <h3>Tillgängliga resurser</h3>
-        <!-- Resources will be loaded dynamically from Supabase -->
-    </div>
-
-    <div class="add-item-form">
-        <input type="text" id="newItemInput" placeholder="Skriv ny resurs här">
-        <button onclick="addNewItem()">Lägg till</button>
-    </div>
 
     <!-- HR Row -->
     <div class="entity-row">
         <div class="entity-title">HR</div>
         <div class="risk-columns">
-            <div class="risk-column no-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column no-risk">
                 <h3>🟢 Ej risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'HR', 'No')">+</button>
             </div>
-            <div class="risk-column at-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column at-risk">
                 <h3>🟡 Risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'HR', 'At')">+</button>
             </div>
-            <div class="risk-column high-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column high-risk">
                 <h3>🔴 Hög risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'HR', 'High')">+</button>
             </div>
         </div>
         <div class="indicators">
@@ -1250,14 +675,20 @@
     <div class="entity-row">
         <div class="entity-title">Företagshälsovård</div>
         <div class="risk-columns">
-            <div class="risk-column no-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column no-risk">
                 <h3>🟢 Ej risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Företagshälsovård', 'No')">+</button>
             </div>
-            <div class="risk-column at-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column at-risk">
                 <h3>🟡 Risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Företagshälsovård', 'At')">+</button>
             </div>
-            <div class="risk-column high-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column high-risk">
                 <h3>🔴 Hög risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Företagshälsovård', 'High')">+</button>
             </div>
         </div>
         <div class="indicators">
@@ -1271,14 +702,20 @@
     <div class="entity-row">
         <div class="entity-title">Specialistinterventioner</div>
         <div class="risk-columns">
-            <div class="risk-column no-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column no-risk">
                 <h3>🟢 Ej risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'No')">+</button>
             </div>
-            <div class="risk-column at-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column at-risk">
                 <h3>🟡 Risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'At')">+</button>
             </div>
-            <div class="risk-column high-risk" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="risk-column high-risk">
                 <h3>🔴 Hög risk</h3>
+                <div class="items-container"></div>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'High')">+</button>
             </div>
         </div>
         <div class="indicators">
@@ -1288,47 +725,899 @@
         </div>
     </div>
 
-    <!-- Login/Signup Forms -->
-    {% if not session.get('user_id') %}
-        <!-- Login Form -->
-        <div class="auth-form">
-            <h3>Login</h3>
-            <form action="/login" method="post">
-                <div class="form-group">
-                    <label for="login-email">Email</label>
-                    <input type="email" id="login-email" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Password</label>
-                    <input type="password" id="login-password" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Login</button>
-            </form>
+    <!-- Status message and auto-save indicator -->
+    <div class="container">
+        <div id="auto-save-indicator" class="auto-save-indicator"></div>
+        <div id="status-message" class="status-message"></div>
+    </div>
+
+    <!-- Rating selector popup -->
+    <div id="rating-selector" class="rating-selector">
+        <div class="rating-option" onclick="selectRating('➕')">➕ Rätt riskgrupp i rätt tid</div>
+        <div class="rating-option" onclick="selectRating('➕➕')">➕➕ Används i önskad utsträckning</div>
+        <div class="rating-option" onclick="selectRating('➕➕➕')">➕➕➕ Har avsedd effekt</div>
+        <div class="rating-option" onclick="selectRating('')">Ingen bedömning</div>
+    </div>
+    
+    <!-- Drag hint for first-time users -->
+    <div id="drag-hint" class="drag-hint" style="display: none;">
+        <i class="bi bi-lightbulb"></i>
+        <div class="drag-hint-content">
+            <span id="drag-hint-text">Du kan dra i handtaget <i class="bi bi-grip-vertical"></i> för att ändra ordning på objekten</span>
+            <div class="tip-navigation">
+                <button class="tip-nav-btn" onclick="previousTip()"><i class="bi bi-chevron-left"></i></button>
+                <span class="tip-counter"><span id="current-tip">1</span>/<span id="total-tips">6</span></span>
+                <button class="tip-nav-btn" onclick="nextTip()"><i class="bi bi-chevron-right"></i></button>
+            </div>
         </div>
+        <span class="drag-hint-close" onclick="closeDragHint()">✕</span>
+    </div>
+    
+    <!-- Help floating button -->
+    <div id="help-floating-btn" class="help-floating-btn" onclick="showDragHint(true)">
+        <i class="bi bi-lightbulb"></i>
+    </div>
+    
+    <!-- Keyboard shortcuts modal -->
+    <div id="shortcuts-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeShortcutsModal()">&times;</span>
+            <h3>Tangentbordsgenvägar</h3>
+            <table class="shortcuts-table">
+                <tr>
+                    <td><kbd>Enter</kbd></td>
+                    <td>Avsluta redigering och spara</td>
+                </tr>
+                <tr>
+                    <td><kbd>Esc</kbd></td>
+                    <td>Avbryt redigering</td>
+                </tr>
+                <tr>
+                    <td><kbd>Tab</kbd></td>
+                    <td>Gå till nästa objekt</td>
+                </tr>
+                <tr>
+                    <td><kbd>Shift</kbd> + <kbd>Tab</kbd></td>
+                    <td>Gå till föregående objekt</td>
+                </tr>
+                <tr>
+                    <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+                    <td>Spara alla ändringar manuellt</td>
+                </tr>
+                <tr>
+                    <td><kbd>Ctrl</kbd> + <kbd>N</kbd></td>
+                    <td>Lägg till nytt objekt</td>
+                </tr>
+                <tr>
+                    <td><kbd>Delete</kbd></td>
+                    <td>Ta bort markerat objekt</td>
+                </tr>
+                <tr>
+                    <td><kbd>?</kbd></td>
+                    <td>Visa denna hjälp</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Welcome tutorial modal -->
+    <div id="welcome-modal" class="modal" style="display: none;">
+        <div class="modal-content welcome-content">
+            <span class="close-modal" onclick="closeWelcomeModal()">&times;</span>
+            <h3>Välkommen till SENTION Kartläggning!</h3>
+            <div class="welcome-steps">
+                <div class="welcome-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Lägg till objekt</h4>
+                        <p>Klicka på <strong>+</strong> knappen i respektive kolumn för att lägga till ett nytt objekt.</p>
+                    </div>
+                </div>
+                <div class="welcome-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Redigera text</h4>
+                        <p>Klicka på texten för att redigera den. Tryck <kbd>Enter</kbd> när du är klar.</p>
+                    </div>
+                </div>
+                <div class="welcome-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Sätt betyg</h4>
+                        <p>Klicka på betygsområdet för att välja ett betyg från listan.</p>
+                    </div>
+                </div>
+                <div class="welcome-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Ändra ordning</h4>
+                        <p>Dra i handtaget <i class="bi bi-grip-vertical"></i> för att ändra ordning på objekten.</p>
+                    </div>
+                </div>
+                <div class="welcome-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h4>Automatisk sparning</h4>
+                        <p>Alla ändringar sparas automatiskt. Du kan se status i botten av sidan.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="welcome-footer">
+                <button class="welcome-btn" onclick="closeWelcomeModal()">Kom igång</button>
+                <label class="dont-show-again">
+                    <input type="checkbox" id="dont-show-welcome" onchange="updateWelcomePreference()">
+                    Visa inte igen
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = '{{ supabase_url }}';
+        const supabaseKey = '{{ supabase_key }}';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+        const currentCategory = "{{ current_category }}";
         
-        <!-- Signup Form -->
-        <div class="auth-form">
-            <h3>Sign Up</h3>
-            <form action="/signup" method="post">
-                <div class="form-group">
-                    <label for="signup-username">Username</label>
-                    <input type="text" id="signup-username" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="signup-email">Email</label>
-                    <input type="email" id="signup-email" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="signup-password">Password</label>
-                    <input type="password" id="signup-password" name="password" required>
-                </div>
-                <div class="form-group">
-                    <label for="signup-fullname">Full Name</label>
-                    <input type="text" id="signup-fullname" name="full_name">
-                </div>
-                <button type="submit" class="btn btn-primary">Sign Up</button>
-            </form>
-        </div>
-    {% endif %}
+        // Auto-save variables
+        let saveTimeout = null;
+        const saveDelay = 1000; // 1 second delay before saving
+        
+        // Current cell being rated
+        let currentRatingCell = null;
+        
+        // Track currently editing cell
+        let currentlyEditingCell = null;
+        let isCurrentlySaving = false;
+        
+        // Drag and drop variables
+        let draggedItem = null;
+
+        // Function to add new item
+        function addNewItem(button, entity, riskLevel) {
+            const column = button.closest('.risk-column');
+            const container = column.querySelector('.items-container');
+            
+            // Create new item
+            const item = document.createElement('div');
+            item.className = 'item';
+            item.setAttribute('draggable', 'true');
+            item.innerHTML = `
+                <i class="bi bi-grip-vertical drag-handle"></i>
+                <div class="item-text" contenteditable="true" data-placeholder="Skriv text här" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></div>
+                <div class="item-rating" onclick="showRatingSelector(this)"></div>
+                <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+            `;
+            
+            // Add to container
+            container.insertBefore(item, container.firstChild);
+            
+            // Focus on the text element
+            const textElement = item.querySelector('.item-text');
+            textElement.focus();
+            
+            // Add click handler to make text editable when clicked
+            textElement.addEventListener('blur', function() {
+                // After the initial edit, set contenteditable to false
+                textElement.setAttribute('contenteditable', 'false');
+                
+                // Add click handler to make it editable again when clicked
+                textElement.addEventListener('click', function() {
+                    if (textElement.getAttribute('contenteditable') === 'false') {
+                        textElement.setAttribute('contenteditable', 'true');
+                        textElement.focus();
+                    }
+                });
+            });
+            
+            // Add drag and drop event listeners
+            initializeDragForItem(item);
+            
+            // Trigger auto-save
+            triggerAutoSave();
+        }
+        
+        // Initialize drag and drop for an item
+        function initializeDragForItem(item) {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+            item.addEventListener('dragover', handleDragOver);
+            item.addEventListener('drop', handleDrop);
+        }
+        
+        // Drag and drop event handlers
+        function handleDragStart(e) {
+            // Only allow dragging if we're not editing a cell
+            if (currentlyEditingCell) {
+                e.preventDefault();
+                return;
+            }
+            
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+        }
+        
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            // Remove drag-over class from all items
+            const items = document.querySelectorAll('.item');
+            items.forEach(item => item.classList.remove('drag-over'));
+            
+            // Remove drag-over class from all containers
+            const containers = document.querySelectorAll('.items-container');
+            containers.forEach(container => container.classList.remove('container-drag-over'));
+            
+            draggedItem = null;
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            // Don't allow dragging if any cell is being edited
+            if (currentlyEditingCell) {
+                return;
+            }
+            
+            // Handle drag over items
+            const item = e.target.closest('.item');
+            if (item && item !== draggedItem) {
+                // Remove drag-over class from all items
+                const items = document.querySelectorAll('.item');
+                items.forEach(i => i.classList.remove('drag-over'));
+                
+                // Get mouse position relative to the item
+                const rect = item.getBoundingClientRect();
+                const mouseY = e.clientY;
+                const threshold = rect.top + (rect.height / 2);
+                
+                // Add drag-over class to the appropriate item
+                if (mouseY < threshold) {
+                    item.classList.add('drag-over');
+                } else {
+                    // If mouse is in bottom half, add class to next item if it exists
+                    const nextItem = item.nextElementSibling;
+                    if (nextItem) {
+                        nextItem.classList.add('drag-over');
+                    } else {
+                        // If there's no next item, add class to current item
+                        item.classList.add('drag-over');
+                    }
+                }
+            }
+            // Handle drag over empty containers
+            else {
+                const container = e.target.closest('.items-container');
+                if (container && (!container.contains(draggedItem) || container.children.length === 0)) {
+                    // Remove drag-over class from all containers
+                    const containers = document.querySelectorAll('.items-container');
+                    containers.forEach(c => c.classList.remove('container-drag-over'));
+                    
+                    // Add drag-over class to this container
+                    container.classList.add('container-drag-over');
+                }
+            }
+            
+            return false;
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            // Don't allow dropping if any cell is being edited
+            if (currentlyEditingCell) {
+                return;
+            }
+            
+            // Handle drop on items
+            const item = e.target.closest('.item');
+            if (draggedItem && item && item !== draggedItem) {
+                // Get mouse position relative to the item
+                const rect = item.getBoundingClientRect();
+                const mouseY = e.clientY;
+                const threshold = rect.top + (rect.height / 2);
+                
+                // Remove drag-over class
+                item.classList.remove('drag-over');
+                
+                // Get the container
+                const container = item.parentNode;
+                
+                // Insert the item based on mouse position
+                if (mouseY < threshold) {
+                    container.insertBefore(draggedItem, item);
+                } else {
+                    container.insertBefore(draggedItem, item.nextSibling);
+                }
+                
+                // Trigger auto-save to save the new order
+                triggerAutoSave();
+            }
+            // Handle drop on empty containers
+            else {
+                const container = e.target.closest('.items-container');
+                if (draggedItem && container) {
+                    // Remove container drag-over class
+                    container.classList.remove('container-drag-over');
+                    
+                    // Append to the container
+                    container.appendChild(draggedItem);
+                    
+                    // Trigger auto-save to save the new order and risk level
+                    triggerAutoSave();
+                }
+            }
+            
+            return false;
+        }
+
+        // Function to handle cell focus
+        function handleCellFocus(cell) {
+            // Mark this cell as being edited
+            currentlyEditingCell = cell;
+            cell.classList.add('cell-editing');
+        }
+        
+        // Function to handle cell changes
+        function handleCellChange(cell) {
+            // Remove editing indicator
+            cell.classList.remove('cell-editing');
+            
+            // Clear currently editing cell if it's this one
+            if (currentlyEditingCell === cell) {
+                currentlyEditingCell = null;
+            }
+            
+            // Trigger auto-save
+            triggerAutoSave();
+        }
+
+        // Function to show rating selector
+        function showRatingSelector(cell) {
+            // Store reference to current cell
+            currentRatingCell = cell;
+            
+            // Get rating selector
+            const selector = document.getElementById('rating-selector');
+            
+            // Position selector near the cell
+            const rect = cell.getBoundingClientRect();
+            selector.style.top = (rect.bottom + window.scrollY) + 'px';
+            selector.style.left = rect.left + 'px';
+            
+            // Show selector
+            selector.style.display = 'block';
+            
+            // Add event listener to close selector when clicking outside
+            document.addEventListener('click', closeRatingSelectorOutside);
+        }
+        
+        // Function to close rating selector when clicking outside
+        function closeRatingSelectorOutside(event) {
+            const selector = document.getElementById('rating-selector');
+            
+            // Check if click is outside the selector and not on a rating cell
+            if (!selector.contains(event.target) && 
+                !event.target.classList.contains('item-rating')) {
+                selector.style.display = 'none';
+                document.removeEventListener('click', closeRatingSelectorOutside);
+            }
+        }
+        
+        // Function to select a rating
+        function selectRating(rating) {
+            if (currentRatingCell) {
+                currentRatingCell.textContent = rating;
+                
+                // Hide selector
+                document.getElementById('rating-selector').style.display = 'none';
+                document.removeEventListener('click', closeRatingSelectorOutside);
+                
+                // Trigger auto-save
+                triggerAutoSave();
+            }
+        }
+        
+        // Function to delete item
+        function deleteItem(button) {
+            const item = button.closest('.item');
+            item.remove();
+            
+            // Trigger auto-save
+            triggerAutoSave();
+        }
+        
+        // Function to trigger auto-save with debounce
+        function triggerAutoSave() {
+            // Show saving indicator
+            const autoSaveIndicator = document.getElementById('auto-save-indicator');
+            autoSaveIndicator.innerHTML = '<span class="saving">Sparar...</span>';
+            
+            // Clear previous timeout
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            
+            // Set new timeout
+            saveTimeout = setTimeout(() => {
+                saveDataToSupabase();
+            }, saveDelay);
+        }
+        
+        // Function to show status message
+        function showStatusMessage(message, isSuccess) {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message';
+            
+            if (isSuccess) {
+                statusMessage.classList.add('success-message');
+            } else {
+                statusMessage.classList.add('error-message');
+            }
+            
+            statusMessage.style.display = 'block';
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Function to collect all items data
+        function collectItemsData() {
+            const items = [];
+            
+            // Get all entity rows
+            const entityRows = document.querySelectorAll('.entity-row');
+            
+            entityRows.forEach(entityRow => {
+                const entity = entityRow.querySelector('.entity-title').textContent;
+                
+                // Get all risk columns in this entity row
+                const riskColumns = entityRow.querySelectorAll('.risk-column');
+                
+                riskColumns.forEach(column => {
+                    // Determine risk level
+                    let riskLevel = 'Unknown';
+                    if (column.classList.contains('no-risk')) riskLevel = 'No';
+                    if (column.classList.contains('at-risk')) riskLevel = 'At';
+                    if (column.classList.contains('high-risk')) riskLevel = 'High';
+                    
+                    // Get all items in this column
+                    const itemElements = column.querySelectorAll('.item');
+                    
+                    itemElements.forEach((item, index) => {
+                        const text = item.querySelector('.item-text').textContent.trim();
+                        const rating = item.querySelector('.item-rating').textContent.trim();
+                        
+                        if (text) {
+                            items.push({
+                                text: text,
+                                entity: entity,
+                                risk_level: riskLevel,
+                                category: currentCategory,
+                                rating: rating,
+                                position: index
+                            });
+                        }
+                    });
+                });
+            });
+            
+            return items;
+        }
+        
+        // Function to save data to Supabase
+        async function saveDataToSupabase() {
+            try {
+                // Set flag that we're saving
+                isCurrentlySaving = true;
+                
+                const itemsData = collectItemsData();
+                
+                // Use fetch to save data to the server
+                const response = await fetch('/save_items', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        category: currentCategory,
+                        items: itemsData
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'Error saving data');
+                }
+                
+                // Update auto-save indicator
+                const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                autoSaveIndicator.innerHTML = 'Sparad';
+                setTimeout(() => {
+                    autoSaveIndicator.innerHTML = '';
+                }, 2000);
+                
+                // Reset saving flag
+                isCurrentlySaving = false;
+                
+            } catch (error) {
+                console.error('Error saving data:', error);
+                
+                // Update auto-save indicator
+                const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                autoSaveIndicator.innerHTML = 'Fel vid sparande';
+                
+                // Show error message
+                showStatusMessage('Ett fel uppstod när data skulle sparas: ' + error.message, false);
+                
+                // Reset saving flag
+                isCurrentlySaving = false;
+            }
+        }
+        
+        // Initialize drag and drop for all containers
+        function initializeDragAndDrop() {
+            // Initialize items
+            const items = document.querySelectorAll('.item');
+            items.forEach(item => {
+                initializeDragForItem(item);
+            });
+            
+            // Initialize containers
+            const containers = document.querySelectorAll('.items-container');
+            containers.forEach(container => {
+                container.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    
+                    // Don't allow dragging if any cell is being edited
+                    if (currentlyEditingCell) {
+                        return;
+                    }
+                    
+                    // If container is empty or doesn't contain the dragged item
+                    if (draggedItem && (!this.contains(draggedItem) || this.children.length === 0)) {
+                        // Remove drag-over class from all containers
+                        const containers = document.querySelectorAll('.items-container');
+                        containers.forEach(c => c.classList.remove('container-drag-over'));
+                        
+                        // Add drag-over class to this container
+                        this.classList.add('container-drag-over');
+                    }
+                });
+                
+                container.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    
+                    // Don't allow dropping if any cell is being edited
+                    if (currentlyEditingCell) {
+                        return;
+                    }
+                    
+                    // If we have a dragged item and we're not dropping on another item
+                    if (draggedItem && !e.target.closest('.item')) {
+                        // Remove container drag-over class
+                        this.classList.remove('container-drag-over');
+                        
+                        // Append to the container
+                        this.appendChild(draggedItem);
+                        
+                        // Trigger auto-save to save the new order and risk level
+                        triggerAutoSave();
+                    }
+                });
+            });
+        }
+        
+        // Load saved items when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedItems = JSON.parse('{{ saved_items_json | safe }}' || '[]');
+            
+            savedItems.forEach(item => {
+                if (item.category === currentCategory) {
+                    // Find the correct container
+                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                        .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                    
+                    if (entityRow) {
+                        const riskColumn = entityRow.querySelector(
+                            item.risk_level === 'No' ? '.no-risk' :
+                            item.risk_level === 'At' ? '.at-risk' :
+                            '.high-risk'
+                        );
+                        
+                        if (riskColumn) {
+                            const container = riskColumn.querySelector('.items-container');
+                            const itemElement = document.createElement('div');
+                            itemElement.className = 'item';
+                            itemElement.setAttribute('draggable', 'true');
+                            
+                            // Use empty string if rating is null, undefined, or empty
+                            const ratingValue = item.rating || '';
+                            
+                            itemElement.innerHTML = `
+                                <i class="bi bi-grip-vertical drag-handle"></i>
+                                <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
+                                <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                                <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                            `;
+                            container.appendChild(itemElement);
+                            
+                            // Add click handler to make text editable when clicked
+                            const textElement = itemElement.querySelector('.item-text');
+                            textElement.addEventListener('click', function() {
+                                if (textElement.getAttribute('contenteditable') === 'false') {
+                                    textElement.setAttribute('contenteditable', 'true');
+                                    textElement.focus();
+                                }
+                            });
+                            
+                            // Initialize drag and drop for this item
+                            initializeDragForItem(itemElement);
+                        }
+                    }
+                }
+            });
+            
+            // Initialize drag and drop for all containers
+            initializeDragAndDrop();
+            
+            // Check if this is the first visit
+            if (localStorage.getItem('welcomeShown') !== 'true') {
+                // Show welcome modal
+                showWelcomeModal();
+            } else {
+                // Check if drag hint has been dismissed before
+                if (localStorage.getItem('dragHintShown') === 'true') {
+                    // Show help button immediately
+                    showHelpButton();
+                } else {
+                    // Show drag hint after a short delay
+                    setTimeout(showDragHint, 2000);
+                }
+            }
+        });
+        
+        // Function to show welcome modal
+        function showWelcomeModal() {
+            const modal = document.getElementById('welcome-modal');
+            modal.style.display = 'flex';
+        }
+        
+        // Function to close welcome modal
+        function closeWelcomeModal() {
+            const modal = document.getElementById('welcome-modal');
+            modal.style.display = 'none';
+            
+            // Mark as shown
+            localStorage.setItem('welcomeShown', 'true');
+            
+            // Show drag hint after closing welcome modal
+            setTimeout(showDragHint, 1000);
+        }
+        
+        // Function to update welcome preference
+        function updateWelcomePreference() {
+            const checkbox = document.getElementById('dont-show-welcome');
+            if (checkbox.checked) {
+                localStorage.setItem('welcomeShown', 'true');
+            } else {
+                localStorage.removeItem('welcomeShown');
+            }
+        }
+        
+        // Function to show drag hint
+        function showDragHint(forceShow = false) {
+            // If forceShow is true, show the hint regardless of localStorage
+            if (!forceShow) {
+                // Check if user has dismissed drag hint before
+                if (localStorage.getItem('dragHintShown') === 'true') {
+                    // Show the help button instead
+                    showHelpButton();
+                    return;
+                }
+            }
+            
+            // Hide help button when showing the hint
+            hideHelpButton();
+            
+            const dragHint = document.getElementById('drag-hint');
+            dragHint.style.display = 'flex';
+            
+            // Start rotating tips
+            startRotatingTips();
+            
+            // Hide hint after 30 seconds if not forced
+            if (!forceShow) {
+                setTimeout(() => {
+                    dragHint.style.display = 'none';
+                    stopRotatingTips();
+                    showHelpButton();
+                }, 30000);
+            }
+        }
+        
+        // Function to close drag hint
+        function closeDragHint() {
+            const dragHint = document.getElementById('drag-hint');
+            dragHint.style.display = 'none';
+            
+            // Stop rotating tips
+            stopRotatingTips();
+            
+            // Remember that user has dismissed drag hint
+            localStorage.setItem('dragHintShown', 'true');
+            
+            // Show the help button
+            showHelpButton();
+        }
+        
+        // Function to show help button
+        function showHelpButton() {
+            const helpButton = document.getElementById('help-floating-btn');
+            helpButton.classList.add('visible');
+        }
+        
+        // Function to hide help button
+        function hideHelpButton() {
+            const helpButton = document.getElementById('help-floating-btn');
+            helpButton.classList.remove('visible');
+        }
+        
+        // Tips array
+        const tips = [
+            "Du kan dra i handtaget <i class=\"bi bi-grip-vertical\"></i> för att ändra ordning på objekten.",
+            "Klicka på texten för att redigera den.",
+            "Klicka på betygsområdet för att välja ett betyg.",
+            "Ändringar sparas automatiskt när du slutar redigera.",
+            "Använd plus-knappen för att lägga till nya objekt.",
+            "Dra objekt mellan kolumner för att ändra risknivå.",
+        ];
+        
+        let currentTipIndex = 0;
+        let tipsInterval = null;
+        
+        // Function to start rotating tips
+        function startRotatingTips() {
+            // Set initial tip
+            updateTipDisplay();
+            
+            // Add transition for smooth fade effect
+            const tipText = document.getElementById('drag-hint-text');
+            tipText.style.transition = 'opacity 0.3s ease';
+            
+            // Rotate through tips every 5 seconds
+            tipsInterval = setInterval(nextTip, 5000);
+        }
+        
+        // Function to stop rotating tips
+        function stopRotatingTips() {
+            if (tipsInterval) {
+                clearInterval(tipsInterval);
+                tipsInterval = null;
+            }
+        }
+        
+        // Function to update the tip display
+        function updateTipDisplay() {
+            const tipText = document.getElementById('drag-hint-text');
+            const currentTipElement = document.getElementById('current-tip');
+            const totalTipsElement = document.getElementById('total-tips');
+            
+            // Update tip text
+            tipText.innerHTML = tips[currentTipIndex];
+            
+            // Update counter
+            currentTipElement.textContent = currentTipIndex + 1;
+            totalTipsElement.textContent = tips.length;
+        }
+        
+        // Function to show next tip
+        function nextTip() {
+            const tipText = document.getElementById('drag-hint-text');
+            
+            // Fade out
+            tipText.style.opacity = '0';
+            
+            // Change to next tip
+            setTimeout(() => {
+                currentTipIndex = (currentTipIndex + 1) % tips.length;
+                updateTipDisplay();
+                tipText.style.opacity = '1';
+            }, 300);
+        }
+        
+        // Function to show previous tip
+        function previousTip() {
+            const tipText = document.getElementById('drag-hint-text');
+            
+            // Fade out
+            tipText.style.opacity = '0';
+            
+            // Change to previous tip
+            setTimeout(() => {
+                currentTipIndex = (currentTipIndex - 1 + tips.length) % tips.length;
+                updateTipDisplay();
+                tipText.style.opacity = '1';
+            }, 300);
+        }
+        
+        // Function to show shortcuts modal
+        function showShortcutsModal() {
+            const modal = document.getElementById('shortcuts-modal');
+            modal.style.display = 'flex';
+        }
+        
+        // Function to close shortcuts modal
+        function closeShortcutsModal() {
+            const modal = document.getElementById('shortcuts-modal');
+            modal.style.display = 'none';
+        }
+        
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Show shortcuts modal when '?' is pressed
+            if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+                showShortcutsModal();
+                e.preventDefault();
+            }
+            
+            // Close modal with Escape key
+            if (e.key === 'Escape' && document.getElementById('shortcuts-modal').style.display === 'flex') {
+                closeShortcutsModal();
+                e.preventDefault();
+            }
+            
+            // Ctrl+S to save manually
+            if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                saveDataToSupabase();
+                e.preventDefault();
+            }
+            
+            // Ctrl+N to add new item in the first column
+            if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+                // Find the first add button and click it
+                const firstAddButton = document.querySelector('.add-item-btn');
+                if (firstAddButton) {
+                    firstAddButton.click();
+                }
+                e.preventDefault();
+            }
+            
+            // Delete key to remove selected item
+            if (e.key === 'Delete' && currentlyEditingCell) {
+                const item = currentlyEditingCell.closest('.item');
+                if (item) {
+                    const deleteButton = item.querySelector('.delete-btn');
+                    if (deleteButton) {
+                        deleteButton.click();
+                    }
+                }
+            }
+            
+            // Enter key to finish editing
+            if (e.key === 'Enter' && currentlyEditingCell) {
+                currentlyEditingCell.blur();
+                e.preventDefault();
+            }
+        });
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(e) {
+            const modal = document.getElementById('shortcuts-modal');
+            if (e.target === modal) {
+                closeShortcutsModal();
+            }
+        });
+    </script>
 </body>
 </html>
