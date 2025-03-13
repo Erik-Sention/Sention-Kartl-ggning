@@ -43,12 +43,12 @@ def get_items(category):
         print(f"Error getting items: {e}")
         return []
 
-def save_item(text, entity, risk_level, position, category, user_id):
+def save_item(text, entity, risk_level, position, category, user_id, rating=None):
     """
     Save an item to the database
     """
     try:
-        print(f"Attempting to save item: {text}, {entity}, {risk_level}, {position}, {category}, {user_id}")
+        print(f"Attempting to save item: {text}, {entity}, {risk_level}, {position}, {category}, {user_id}, {rating}")
         
         # Create the item data
         item_data = {
@@ -57,7 +57,8 @@ def save_item(text, entity, risk_level, position, category, user_id):
             "risk_level": risk_level,
             "position": position,
             "category": category,
-            "user_id": user_id
+            "user_id": user_id,
+            "rating": rating
         }
         
         print(f"Item data: {item_data}")
@@ -106,6 +107,58 @@ def delete_item(text, entity, risk_level, category):
         import traceback
         traceback.print_exc()
         return None
+
+def save_all_items(category, items, user_id):
+    """
+    Save all items for a category at once
+    """
+    try:
+        print(f"Attempting to save all items for category: {category}")
+        
+        # First, delete all existing items for this category
+        delete_response = supabase.table("items") \
+            .delete() \
+            .eq("category", category) \
+            .execute()
+            
+        print(f"Delete all response: {delete_response}")
+        
+        if hasattr(delete_response, 'error') and delete_response.error:
+            print(f"Error deleting items: {delete_response.error}")
+            return False
+        
+        # If there are no items to save, we're done
+        if not items:
+            return True
+        
+        # Prepare all items for insertion
+        items_to_insert = []
+        for item in items:
+            items_to_insert.append({
+                "text": item['text'],
+                "entity": item['entity'],
+                "risk_level": item['risk_level'],
+                "position": item['position'],
+                "category": category,
+                "user_id": user_id,
+                "rating": item.get('rating')
+            })
+        
+        # Insert all items at once
+        insert_response = supabase.table("items").insert(items_to_insert).execute()
+        
+        print(f"Insert all response: {insert_response}")
+        
+        if hasattr(insert_response, 'error') and insert_response.error:
+            print(f"Error inserting items: {insert_response.error}")
+            return False
+            
+        return True
+    except Exception as e:
+        print(f"Exception saving all items: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 def get_user_by_username(username):
     """
