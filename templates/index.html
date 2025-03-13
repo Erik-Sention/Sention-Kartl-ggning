@@ -1859,11 +1859,14 @@
             else {
                 const container = e.target.closest('.items-container');
                 if (draggedItem && container) {
+                    console.log('Dropping on container:', container);
+                    
                     // Remove container drag-over class
                     container.classList.remove('container-drag-over');
                     
                     // Get original position and risk level before moving
                     const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                    console.log('Original risk level:', originalRiskLevel);
                     
                     // Append to the container
                     container.appendChild(draggedItem);
@@ -1874,9 +1877,11 @@
                     if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
                     if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
                     if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
+                    console.log('New risk level:', newRiskLevel);
                     
                     // Update the risk level attribute if it changed
                     if (newRiskLevel !== originalRiskLevel) {
+                        console.log('Risk level changed, updating attribute and broadcasting');
                         draggedItem.setAttribute('data-risk', newRiskLevel);
                         
                         // Broadcast the move to other users
@@ -1887,6 +1892,7 @@
                             draggedItem.getAttribute('data-item-id')
                         );
                     } else {
+                        console.log('Risk level unchanged, broadcasting reorder');
                         // Broadcast position change
                         broadcastItemReorder(
                             draggedItem.getAttribute('data-entity'),
@@ -1906,6 +1912,8 @@
 
         // Broadcast item move between risk levels
         function broadcastItemMove(entityId, originalRiskLevel, newRiskLevel, itemId) {
+            console.log('Broadcasting item move:', { entityId, originalRiskLevel, newRiskLevel, itemId });
+            
             // Broadcast move
             supabaseClient.channel('editing_status').send({
                 type: 'broadcast',
@@ -1917,6 +1925,10 @@
                     newRiskLevel,
                     itemId
                 }
+            }).then(() => {
+                console.log('Item move broadcast sent successfully');
+            }).catch(error => {
+                console.error('Error broadcasting item move:', error);
             });
         }
 
@@ -1976,17 +1988,54 @@
                     
                     // If we have a dragged item and we're not dropping on another item
                     if (draggedItem && !e.target.closest('.item')) {
+                        console.log('Dropping directly on container:', this);
+                        
                         // Remove container drag-over class
                         this.classList.remove('container-drag-over');
+                        
+                        // Get original risk level before moving
+                        const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                        console.log('Original risk level:', originalRiskLevel);
                         
                         // Append to the container
                         this.appendChild(draggedItem);
                         
+                        // Get new risk level after moving
+                        const riskColumn = this.closest('.risk-column');
+                        let newRiskLevel = originalRiskLevel;
+                        if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
+                        if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
+                        if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
+                        console.log('New risk level:', newRiskLevel);
+                        
+                        // Update the risk level attribute if it changed
+                        if (newRiskLevel !== originalRiskLevel) {
+                            console.log('Risk level changed, updating attribute and broadcasting');
+                            draggedItem.setAttribute('data-risk', newRiskLevel);
+                            
+                            // Broadcast the move to other users
+                            broadcastItemMove(
+                                draggedItem.getAttribute('data-entity'),
+                                originalRiskLevel,
+                                newRiskLevel,
+                                draggedItem.getAttribute('data-item-id')
+                            );
+                        } else {
+                            console.log('Risk level unchanged, broadcasting reorder');
+                            // Broadcast position change
+                            broadcastItemReorder(
+                                draggedItem.getAttribute('data-entity'),
+                                newRiskLevel,
+                                draggedItem.getAttribute('data-item-id'),
+                                Array.from(this.children).indexOf(draggedItem)
+                            );
+                        }
+                        
                         // Trigger auto-save to save the new order and risk level
                         triggerAutoSave();
                     }
+                });
             });
-        });
         }
 
         // Load saved items when page loads
@@ -2393,23 +2442,42 @@
 
         // Handle item move between risk levels
         function handleItemMove(payload) {
-            console.log('Item move update:', payload);
+            console.log('Item move update received:', payload);
             
             // If this is our own update, ignore it
             if (payload.payload.userId === sessionUserId) {
+                console.log('Ignoring own item move update');
                 return;
             }
             
             const { entityId, originalRiskLevel, newRiskLevel, itemId } = payload.payload;
+            console.log('Processing item move:', { entityId, originalRiskLevel, newRiskLevel, itemId });
             
-            // Find the item
-            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${originalRiskLevel}"][data-item-id="${itemId}"]`);
+            // First try to find the item with the original risk level
+            let item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${originalRiskLevel}"][data-item-id="${itemId}"]`);
+            
+            // If not found, try with the new risk level (in case it was already updated)
+            if (!item) {
+                console.log('Item not found with original risk level, trying new risk level');
+                item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${newRiskLevel}"][data-item-id="${itemId}"]`);
+            }
+            
+            // If still not found, try with just the item ID (most permissive)
+            if (!item) {
+                console.log('Item not found with specific risk level, trying just item ID');
+                item = document.querySelector(`.item[data-item-id="${itemId}"]`);
+            }
+            
             if (item) {
+                console.log('Found item to move:', item);
+                
                 // Find the target container
                 const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                     .find(row => row.querySelector('.entity-title').textContent === entityId);
                 
                 if (entityRow) {
+                    console.log('Found entity row:', entityRow);
+                    
                     const targetRiskColumn = entityRow.querySelector(
                         newRiskLevel === 'No' ? '.no-risk' :
                         newRiskLevel === 'At' ? '.at-risk' :
@@ -2417,13 +2485,17 @@
                     );
                     
                     if (targetRiskColumn) {
+                        console.log('Found target risk column:', targetRiskColumn);
+                        
                         const targetContainer = targetRiskColumn.querySelector('.items-container');
                         
                         // Update the risk level attribute
-                        item.setAttribute('data-risk', newRiskLevel);
+                        item.setAttribute('data-entity', entityId); // Ensure entity is correct
+                        item.setAttribute('data-risk', newRiskLevel); // Update risk level
                         
                         // Move the item to the new container
                         targetContainer.appendChild(item);
+                        console.log('Item moved to new container');
                         
                         // Show a subtle notification that content was updated
                         const autoSaveIndicator = document.getElementById('auto-save-indicator');
@@ -2431,8 +2503,14 @@
                         setTimeout(() => {
                             autoSaveIndicator.innerHTML = '';
                         }, 2000);
+                    } else {
+                        console.error('Target risk column not found for level:', newRiskLevel);
                     }
+                } else {
+                    console.error('Entity row not found for entity:', entityId);
                 }
+            } else {
+                console.error('Item not found for move:', { entityId, originalRiskLevel, itemId });
             }
         }
 
