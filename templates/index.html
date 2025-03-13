@@ -966,6 +966,20 @@
                         handleNewItem(payload);
                     }
                 )
+                .on(
+                    'broadcast',
+                    { event: 'item_move' },
+                    (payload) => {
+                        handleItemMove(payload);
+                    }
+                )
+                .on(
+                    'broadcast',
+                    { event: 'item_reorder' },
+                    (payload) => {
+                        handleItemReorder(payload);
+                    }
+                )
                 .subscribe();
                 
             // Set up a heartbeat to keep editing status alive
@@ -1800,11 +1814,42 @@
                 // Get the container
                 const container = item.parentNode;
                 
+                // Get original position and risk level before moving
+                const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                
                 // Insert the item based on mouse position
                 if (mouseY < threshold) {
                     container.insertBefore(draggedItem, item);
-                    } else {
+                } else {
                     container.insertBefore(draggedItem, item.nextSibling);
+                }
+                
+                // Get new risk level after moving
+                const riskColumn = container.closest('.risk-column');
+                let newRiskLevel = originalRiskLevel;
+                if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
+                if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
+                if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
+                
+                // Update the risk level attribute if it changed
+                if (newRiskLevel !== originalRiskLevel) {
+                    draggedItem.setAttribute('data-risk', newRiskLevel);
+                    
+                    // Broadcast the move to other users
+                    broadcastItemMove(
+                        draggedItem.getAttribute('data-entity'),
+                        originalRiskLevel,
+                        newRiskLevel,
+                        draggedItem.getAttribute('data-item-id')
+                    );
+                } else {
+                    // Broadcast position change
+                    broadcastItemReorder(
+                        draggedItem.getAttribute('data-entity'),
+                        newRiskLevel,
+                        draggedItem.getAttribute('data-item-id'),
+                        Array.from(container.children).indexOf(draggedItem)
+                    );
                 }
                 
                 // Trigger auto-save to save the new order
@@ -1817,8 +1862,39 @@
                     // Remove container drag-over class
                     container.classList.remove('container-drag-over');
                     
+                    // Get original position and risk level before moving
+                    const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                    
                     // Append to the container
                     container.appendChild(draggedItem);
+                    
+                    // Get new risk level after moving
+                    const riskColumn = container.closest('.risk-column');
+                    let newRiskLevel = originalRiskLevel;
+                    if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
+                    if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
+                    if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
+                    
+                    // Update the risk level attribute if it changed
+                    if (newRiskLevel !== originalRiskLevel) {
+                        draggedItem.setAttribute('data-risk', newRiskLevel);
+                        
+                        // Broadcast the move to other users
+                        broadcastItemMove(
+                            draggedItem.getAttribute('data-entity'),
+                            originalRiskLevel,
+                            newRiskLevel,
+                            draggedItem.getAttribute('data-item-id')
+                        );
+                    } else {
+                        // Broadcast position change
+                        broadcastItemReorder(
+                            draggedItem.getAttribute('data-entity'),
+                            newRiskLevel,
+                            draggedItem.getAttribute('data-item-id'),
+                            Array.from(container.children).indexOf(draggedItem)
+                        );
+                    }
                     
                     // Trigger auto-save to save the new order and risk level
                     triggerAutoSave();
@@ -1826,6 +1902,38 @@
             }
             
             return false;
+        }
+
+        // Broadcast item move between risk levels
+        function broadcastItemMove(entityId, originalRiskLevel, newRiskLevel, itemId) {
+            // Broadcast move
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'item_move',
+                payload: {
+                    userId: sessionUserId,
+                    entityId,
+                    originalRiskLevel,
+                    newRiskLevel,
+                    itemId
+                }
+            });
+        }
+
+        // Broadcast item reorder within same risk level
+        function broadcastItemReorder(entityId, riskLevel, itemId, newPosition) {
+            // Broadcast reorder
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'item_reorder',
+                payload: {
+                    userId: sessionUserId,
+                    entityId,
+                    riskLevel,
+                    itemId,
+                    newPosition
+                }
+            });
         }
 
         // Initialize drag and drop for all containers
@@ -2278,6 +2386,105 @@
                         setTimeout(() => {
                             autoSaveIndicator.innerHTML = '';
                         }, 2000);
+                    }
+                }
+            }
+        }
+
+        // Handle item move between risk levels
+        function handleItemMove(payload) {
+            console.log('Item move update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { entityId, originalRiskLevel, newRiskLevel, itemId } = payload.payload;
+            
+            // Find the item
+            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${originalRiskLevel}"][data-item-id="${itemId}"]`);
+            if (item) {
+                // Find the target container
+                const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                    .find(row => row.querySelector('.entity-title').textContent === entityId);
+                
+                if (entityRow) {
+                    const targetRiskColumn = entityRow.querySelector(
+                        newRiskLevel === 'No' ? '.no-risk' :
+                        newRiskLevel === 'At' ? '.at-risk' :
+                        '.high-risk'
+                    );
+                    
+                    if (targetRiskColumn) {
+                        const targetContainer = targetRiskColumn.querySelector('.items-container');
+                        
+                        // Update the risk level attribute
+                        item.setAttribute('data-risk', newRiskLevel);
+                        
+                        // Move the item to the new container
+                        targetContainer.appendChild(item);
+                        
+                        // Show a subtle notification that content was updated
+                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                        autoSaveIndicator.innerHTML = 'Objekt flyttat';
+                        setTimeout(() => {
+                            autoSaveIndicator.innerHTML = '';
+                        }, 2000);
+                    }
+                }
+            }
+        }
+
+        // Handle item reorder within same risk level
+        function handleItemReorder(payload) {
+            console.log('Item reorder update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { entityId, riskLevel, itemId, newPosition } = payload.payload;
+            
+            // Find the item
+            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"][data-item-id="${itemId}"]`);
+            if (item) {
+                // Find the container
+                const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                    .find(row => row.querySelector('.entity-title').textContent === entityId);
+                
+                if (entityRow) {
+                    const riskColumn = entityRow.querySelector(
+                        riskLevel === 'No' ? '.no-risk' :
+                        riskLevel === 'At' ? '.at-risk' :
+                        '.high-risk'
+                    );
+                    
+                    if (riskColumn) {
+                        const container = riskColumn.querySelector('.items-container');
+                        const items = container.children;
+                        
+                        // Only reorder if the position is different
+                        const currentPosition = Array.from(items).indexOf(item);
+                        if (currentPosition !== newPosition) {
+                            // Remove the item from its current position
+                            item.remove();
+                            
+                            // Insert at the new position
+                            if (newPosition < items.length) {
+                                container.insertBefore(item, items[newPosition]);
+                            } else {
+                                container.appendChild(item);
+                            }
+                            
+                            // Show a subtle notification that content was updated
+                            const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                            autoSaveIndicator.innerHTML = 'Ordning ändrad';
+                            setTimeout(() => {
+                                autoSaveIndicator.innerHTML = '';
+                            }, 2000);
+                        }
                     }
                 }
             }
