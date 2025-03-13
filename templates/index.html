@@ -35,6 +35,12 @@
         .rating-option:hover {
             background-color: #f8f9fa;
         }
+        
+        .rating-option.highlighted {
+            background-color: #e9ecef;
+            border-left: 3px solid #0d6efd;
+            font-weight: 500;
+        }
 
         /* Add button styles */
         .add-item-btn {
@@ -1464,6 +1470,11 @@
             // Clear currently editing cell if it's this one
             if (currentlyEditingCell === cell) {
                 currentlyEditingCell = null;
+                
+                // Show rating selector automatically after editing
+                const item = cell.closest('.item');
+                const ratingCell = item.querySelector('.item-rating');
+                showRatingSelector(ratingCell);
             }
             
             // Trigger auto-save
@@ -1486,10 +1497,97 @@
             // Show selector
             selector.style.display = 'block';
             
+            // Highlight the first option by default
+            const options = selector.querySelectorAll('.rating-option');
+            if (options.length > 0) {
+                options.forEach(opt => opt.classList.remove('highlighted'));
+                options[0].classList.add('highlighted');
+                
+                // Set focus to the selector for keyboard navigation
+                selector.setAttribute('tabindex', '-1');
+                selector.focus();
+            }
+            
             // Add event listener to close selector when clicking outside
             document.addEventListener('click', closeRatingSelectorOutside);
+            
+            // Add keyboard event listener for rating selector navigation
+            document.addEventListener('keydown', handleRatingSelectorKeyboard);
         }
         
+        // Function to handle keyboard navigation in rating selector
+        function handleRatingSelectorKeyboard(e) {
+            const selector = document.getElementById('rating-selector');
+            
+            // Only handle if selector is visible
+            if (selector.style.display !== 'block') {
+                document.removeEventListener('keydown', handleRatingSelectorKeyboard);
+                return;
+            }
+            
+            const options = selector.querySelectorAll('.rating-option');
+            const highlightedOption = selector.querySelector('.rating-option.highlighted');
+            let currentIndex = -1;
+            
+            // Find current highlighted index
+            if (highlightedOption) {
+                currentIndex = Array.from(options).indexOf(highlightedOption);
+            }
+            
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    // Move to next option
+                    if (currentIndex < options.length - 1) {
+                        options.forEach(opt => opt.classList.remove('highlighted'));
+                        options[currentIndex + 1].classList.add('highlighted');
+                        options[currentIndex + 1].scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+                    
+                case 'ArrowUp':
+                    e.preventDefault();
+                    // Move to previous option
+                    if (currentIndex > 0) {
+                        options.forEach(opt => opt.classList.remove('highlighted'));
+                        options[currentIndex - 1].classList.add('highlighted');
+                        options[currentIndex - 1].scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+                    
+                case 'Enter':
+                    e.preventDefault();
+                    // Select highlighted option
+                    if (highlightedOption) {
+                        highlightedOption.click();
+                    }
+                    break;
+                    
+                case 'Escape':
+                    e.preventDefault();
+                    // Close selector
+                    selector.style.display = 'none';
+                    document.removeEventListener('click', closeRatingSelectorOutside);
+                    document.removeEventListener('keydown', handleRatingSelectorKeyboard);
+                    break;
+                    
+                case 'Tab':
+                    e.preventDefault();
+                    // Move to next option or close if at last option
+                    if (currentIndex < options.length - 1) {
+                        options.forEach(opt => opt.classList.remove('highlighted'));
+                        options[currentIndex + 1].classList.add('highlighted');
+                        options[currentIndex + 1].scrollIntoView({ block: 'nearest' });
+                    } else {
+                        // At last option, close and move to next element
+                        selector.style.display = 'none';
+                        document.removeEventListener('click', closeRatingSelectorOutside);
+                        document.removeEventListener('keydown', handleRatingSelectorKeyboard);
+                    }
+                    break;
+            }
+        }
+
         // Function to close rating selector when clicking outside
         function closeRatingSelectorOutside(event) {
             const selector = document.getElementById('rating-selector');
@@ -1499,6 +1597,7 @@
                 !event.target.classList.contains('item-rating')) {
                 selector.style.display = 'none';
                 document.removeEventListener('click', closeRatingSelectorOutside);
+                document.removeEventListener('keydown', handleRatingSelectorKeyboard);
             }
         }
         
@@ -1510,6 +1609,7 @@
                 // Hide selector
                 document.getElementById('rating-selector').style.display = 'none';
                 document.removeEventListener('click', closeRatingSelectorOutside);
+                document.removeEventListener('keydown', handleRatingSelectorKeyboard);
                 
                 // Broadcast the rating change to other users
                 broadcastRatingChange(currentRatingCell, rating);
@@ -2446,6 +2546,37 @@
             if (e.key === 'Enter' && currentlyEditingCell) {
                 currentlyEditingCell.blur();
                 e.preventDefault();
+            }
+            
+            // Tab key to show rating selector
+            if (e.key === 'Tab' && !e.shiftKey) {
+                // If we're currently editing a cell, finish editing and show rating selector
+                if (currentlyEditingCell) {
+                    e.preventDefault();
+                    
+                    // Finish editing
+                    currentlyEditingCell.blur();
+                    
+                    // Wait a short moment for the blur event to complete
+                    setTimeout(() => {
+                        // Show rating selector for this item
+                        const item = currentlyEditingCell.closest('.item');
+                        if (item) {
+                            const ratingCell = item.querySelector('.item-rating');
+                            showRatingSelector(ratingCell);
+                        }
+                    }, 50);
+                }
+                // If a rating selector is already open, select the first option
+                else if (document.getElementById('rating-selector').style.display === 'block') {
+                    e.preventDefault();
+                    
+                    // Find the first rating option and click it
+                    const firstOption = document.querySelector('.rating-option');
+                    if (firstOption) {
+                        firstOption.click();
+                    }
+                }
             }
         });
         
