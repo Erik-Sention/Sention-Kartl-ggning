@@ -540,7 +540,8 @@ def save_item():
             data['risk_level'],
             data['position'],
             data['category'],
-            session['user_id']
+            session['user_id'],
+            data.get('rating')  # Add rating parameter
         )
         
         return jsonify({'status': 'success'})
@@ -565,6 +566,25 @@ def delete_item():
         return jsonify({'status': 'success'})
     except Exception as e:
         print(f"Error deleting item: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/save_items', methods=['POST'])
+@login_required
+def save_items():
+    try:
+        data = request.json
+        category = data.get('category')
+        items = data.get('items', [])
+        
+        # Save all items at once
+        result = sb.save_all_items(category, items, session['user_id'])
+        
+        if result:
+            return jsonify({'status': 'success'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Failed to save items'}), 500
+    except Exception as e:
+        print(f"Error saving items: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # Admin route to manage users
