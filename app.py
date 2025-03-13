@@ -587,28 +587,6 @@ def save_items():
         print(f"Error saving items: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/get_items', methods=['GET'])
-@login_required
-def get_items_api():
-    """
-    Get items for a specific category via API
-    """
-    try:
-        category = request.args.get('category')
-        if not category:
-            return jsonify({'status': 'error', 'message': 'Category is required'}), 400
-            
-        # Get items from Supabase
-        items = sb.get_items(category)
-        
-        return jsonify({
-            'status': 'success',
-            'items': items
-        })
-    except Exception as e:
-        print(f"Error getting items: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
 # Admin route to manage users
 @app.route('/admin/users', methods=['GET'])
 @login_required
