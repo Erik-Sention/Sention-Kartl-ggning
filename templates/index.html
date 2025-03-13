@@ -1997,7 +1997,7 @@
                         // Remove container drag-over class
                         this.classList.remove('container-drag-over');
                         
-                        // Get original risk level before moving
+                        // Get original position and risk level before moving
                         const originalRiskLevel = draggedItem.getAttribute('data-risk');
                         console.log('Original risk level:', originalRiskLevel);
                         
@@ -2037,6 +2037,94 @@
                         
                         // Trigger auto-save to save the new order and risk level
                         triggerAutoSave();
+                    }
+                });
+            });
+            
+            // Also initialize risk columns to handle drops directly on them
+            const riskColumns = document.querySelectorAll('.risk-column');
+            riskColumns.forEach(column => {
+                column.addEventListener('dragover', function(e) {
+                    // Don't allow dragging if any cell is being edited
+                    if (currentlyEditingCell) {
+                        return;
+                    }
+                    
+                    // Only handle if we're not already over an items-container
+                    if (!e.target.closest('.items-container') && draggedItem) {
+                        e.preventDefault();
+                        
+                        // Find the items container within this risk column
+                        const container = this.querySelector('.items-container');
+                        if (container) {
+                            // Remove drag-over class from all containers
+                            const containers = document.querySelectorAll('.items-container');
+                            containers.forEach(c => c.classList.remove('container-drag-over'));
+                            
+                            // Add drag-over class to this container
+                            container.classList.add('container-drag-over');
+                        }
+                    }
+                });
+                
+                column.addEventListener('drop', function(e) {
+                    // Don't allow dropping if any cell is being edited
+                    if (currentlyEditingCell) {
+                        return;
+                    }
+                    
+                    // Only handle if we're not already over an items-container
+                    if (!e.target.closest('.items-container') && draggedItem) {
+                        e.preventDefault();
+                        
+                        console.log('Dropping on risk column:', this);
+                        
+                        // Find the items container within this risk column
+                        const container = this.querySelector('.items-container');
+                        if (container) {
+                            // Remove container drag-over class
+                            container.classList.remove('container-drag-over');
+                            
+                            // Get original position and risk level before moving
+                            const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                            console.log('Original risk level:', originalRiskLevel);
+                            
+                            // Append to the container
+                            container.appendChild(draggedItem);
+                            
+                            // Get new risk level after moving
+                            let newRiskLevel = originalRiskLevel;
+                            if (this.classList.contains('no-risk')) newRiskLevel = 'No';
+                            if (this.classList.contains('at-risk')) newRiskLevel = 'At';
+                            if (this.classList.contains('high-risk')) newRiskLevel = 'High';
+                            console.log('New risk level:', newRiskLevel);
+                            
+                            // Update the risk level attribute if it changed
+                            if (newRiskLevel !== originalRiskLevel) {
+                                console.log('Risk level changed, updating attribute and broadcasting');
+                                draggedItem.setAttribute('data-risk', newRiskLevel);
+                                
+                                // Broadcast the move to other users
+                                broadcastItemMove(
+                                    draggedItem.getAttribute('data-entity'),
+                                    originalRiskLevel,
+                                    newRiskLevel,
+                                    draggedItem.getAttribute('data-item-id')
+                                );
+                            } else {
+                                console.log('Risk level unchanged, broadcasting reorder');
+                                // Broadcast position change
+                                broadcastItemReorder(
+                                    draggedItem.getAttribute('data-entity'),
+                                    newRiskLevel,
+                                    draggedItem.getAttribute('data-item-id'),
+                                    Array.from(container.children).indexOf(draggedItem)
+                                );
+                            }
+                            
+                            // Trigger auto-save to save the new order and risk level
+                            triggerAutoSave();
+                        }
                     }
                 });
             });
