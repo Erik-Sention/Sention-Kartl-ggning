@@ -974,11 +974,61 @@
                 const newItem = payload.new;
                 const oldItem = payload.old;
                 
+                // Only process changes for the current category
+                if (newItem && newItem.category !== currentCategory && oldItem && oldItem.category !== currentCategory) {
+                    console.log('Ignoring change for different category');
+                    return;
+                }
+                
                 if (eventType === 'INSERT' && newItem && newItem.category === currentCategory) {
                     // Handle new item insertion
                     console.log('Handling new item insertion:', newItem);
                     
-                    // Find the correct container
+                    // Check if this item already exists (by id)
+                    const existingItem = document.querySelector(`.item[data-item-id="${newItem.id}"]`);
+                    if (existingItem) {
+                        console.log('Item already exists, updating instead of inserting');
+                        
+                        // Update text and rating
+                        const textElement = existingItem.querySelector('.item-text');
+                        textElement.textContent = newItem.text;
+                        
+                        const ratingElement = existingItem.querySelector('.item-rating');
+                        ratingElement.textContent = newItem.rating || '';
+                        
+                        // Check if we need to move the item
+                        const currentEntity = existingItem.getAttribute('data-entity');
+                        const currentRisk = existingItem.getAttribute('data-risk');
+                        
+                        if (currentEntity !== newItem.entity || currentRisk !== newItem.risk_level) {
+                            // Find the new container
+                            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                                .find(row => row.querySelector('.entity-title').textContent === newItem.entity);
+                            
+                            if (entityRow) {
+                                const riskColumn = entityRow.querySelector(
+                                    newItem.risk_level === 'No' ? '.no-risk' :
+                                    newItem.risk_level === 'At' ? '.at-risk' :
+                                    '.high-risk'
+                                );
+                                
+                                if (riskColumn) {
+                                    const container = riskColumn.querySelector('.items-container');
+                                    
+                                    // Update data attributes
+                                    existingItem.setAttribute('data-entity', newItem.entity);
+                                    existingItem.setAttribute('data-risk', newItem.risk_level);
+                                    
+                                    // Move the item to the new container
+                                    container.appendChild(existingItem);
+                                }
+                            }
+                        }
+                        
+                        return;
+                    }
+                    
+                    // Find the correct container for the new item
                     const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === newItem.entity);
                     
@@ -990,52 +1040,49 @@
                         );
                         
                         if (riskColumn) {
-                            // Check if this item already exists (by id)
-                            const existingItem = document.querySelector(`.item[data-item-id="${newItem.id}"]`);
-                            if (!existingItem) {
-                                const container = riskColumn.querySelector('.items-container');
-                                const itemElement = document.createElement('div');
-                                itemElement.className = 'item';
-                                itemElement.setAttribute('draggable', 'true');
-                                itemElement.setAttribute('data-entity', newItem.entity);
-                                itemElement.setAttribute('data-risk', newItem.risk_level);
-                                itemElement.setAttribute('data-item-id', newItem.id);
-                                
-                                // Use empty string if rating is null, undefined, or empty
-                                const ratingValue = newItem.rating || '';
-                                
-                                itemElement.innerHTML = `
-                                    <i class="bi bi-grip-vertical drag-handle"></i>
-                                    <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${newItem.text}</div>
-                                    <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
-                                    <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
-                                `;
-                                
-                                // Insert at the correct position
-                                const position = newItem.position || 0;
-                                const items = container.querySelectorAll('.item');
-                                
-                                if (items.length === 0 || position >= items.length) {
-                                    container.appendChild(itemElement);
-                                } else {
-                                    container.insertBefore(itemElement, items[position]);
-                                }
-                                
-                                // Add click handler to make text editable when clicked
-                                const textElement = itemElement.querySelector('.item-text');
-                                textElement.addEventListener('click', function() {
-                                    if (textElement.getAttribute('contenteditable') === 'false') {
-                                        textElement.setAttribute('contenteditable', 'true');
-                                        textElement.focus();
-                                    }
-                                });
-                                
-                                // Initialize drag and drop for this item
-                                initializeDragForItem(itemElement);
+                            const container = riskColumn.querySelector('.items-container');
+                            const itemElement = document.createElement('div');
+                            itemElement.className = 'item';
+                            itemElement.setAttribute('draggable', 'true');
+                            itemElement.setAttribute('data-entity', newItem.entity);
+                            itemElement.setAttribute('data-risk', newItem.risk_level);
+                            itemElement.setAttribute('data-item-id', newItem.id);
+                            
+                            // Use empty string if rating is null, undefined, or empty
+                            const ratingValue = newItem.rating || '';
+                            
+                            itemElement.innerHTML = `
+                                <i class="bi bi-grip-vertical drag-handle"></i>
+                                <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${newItem.text}</div>
+                                <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                                <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                            `;
+                            
+                            // Insert at the correct position
+                            const position = newItem.position || 0;
+                            const items = container.querySelectorAll('.item');
+                            
+                            if (items.length === 0 || position >= items.length) {
+                                container.appendChild(itemElement);
+                            } else {
+                                container.insertBefore(itemElement, items[position]);
                             }
+                            
+                            // Add click handler to make text editable when clicked
+                            const textElement = itemElement.querySelector('.item-text');
+                            textElement.addEventListener('click', function() {
+                                if (textElement.getAttribute('contenteditable') === 'false') {
+                                    textElement.setAttribute('contenteditable', 'true');
+                                    textElement.focus();
+                                }
+                            });
+                            
+                            // Initialize drag and drop for this item
+                            initializeDragForItem(itemElement);
                         }
                     }
-                } else if (eventType === 'UPDATE' && newItem && oldItem && newItem.category === currentCategory) {
+                } else if (eventType === 'UPDATE' && newItem && oldItem && 
+                          (newItem.category === currentCategory || oldItem.category === currentCategory)) {
                     // Handle item update
                     console.log('Handling item update:', newItem);
                     
@@ -1101,6 +1148,64 @@
                             const ratingElement = itemElement.querySelector('.item-rating');
                             ratingElement.textContent = newItem.rating || '';
                         }
+                    } else if (newItem.category === currentCategory) {
+                        // Item doesn't exist in the DOM but should be in this category
+                        // This can happen if the item was moved from another category
+                        console.log('Item not found in DOM, adding it');
+                        
+                        // Find the correct container
+                        const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                            .find(row => row.querySelector('.entity-title').textContent === newItem.entity);
+                        
+                        if (entityRow) {
+                            const riskColumn = entityRow.querySelector(
+                                newItem.risk_level === 'No' ? '.no-risk' :
+                                newItem.risk_level === 'At' ? '.at-risk' :
+                                '.high-risk'
+                            );
+                            
+                            if (riskColumn) {
+                                const container = riskColumn.querySelector('.items-container');
+                                const itemElement = document.createElement('div');
+                                itemElement.className = 'item';
+                                itemElement.setAttribute('draggable', 'true');
+                                itemElement.setAttribute('data-entity', newItem.entity);
+                                itemElement.setAttribute('data-risk', newItem.risk_level);
+                                itemElement.setAttribute('data-item-id', newItem.id);
+                                
+                                // Use empty string if rating is null, undefined, or empty
+                                const ratingValue = newItem.rating || '';
+                                
+                                itemElement.innerHTML = `
+                                    <i class="bi bi-grip-vertical drag-handle"></i>
+                                    <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${newItem.text}</div>
+                                    <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                                    <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                                `;
+                                
+                                // Insert at the correct position
+                                const position = newItem.position || 0;
+                                const items = container.querySelectorAll('.item');
+                                
+                                if (items.length === 0 || position >= items.length) {
+                                    container.appendChild(itemElement);
+                                } else {
+                                    container.insertBefore(itemElement, items[position]);
+                                }
+                                
+                                // Add click handler to make text editable when clicked
+                                const textElement = itemElement.querySelector('.item-text');
+                                textElement.addEventListener('click', function() {
+                                    if (textElement.getAttribute('contenteditable') === 'false') {
+                                        textElement.setAttribute('contenteditable', 'true');
+                                        textElement.focus();
+                                    }
+                                });
+                                
+                                // Initialize drag and drop for this item
+                                initializeDragForItem(itemElement);
+                            }
+                        }
                     }
                 } else if (eventType === 'DELETE' && oldItem && oldItem.category === currentCategory) {
                     // Handle item deletion
@@ -1116,6 +1221,10 @@
                     console.log('Fetching all items for the current category');
                     fetchItemsForCategory();
                 }
+                
+                // Re-apply editing indicators after any change
+                applyEditingIndicators();
+                
             } catch (error) {
                 console.error('Error handling realtime change:', error);
                 // If there's an error, fetch all items as a fallback
@@ -1140,57 +1249,118 @@
                     throw new Error(data.message || 'Error fetching data');
                 }
                 
-                // Clear all existing items
-                document.querySelectorAll('.items-container').forEach(container => {
-                    container.innerHTML = '';
+                // Get all existing items and create a map for quick lookup
+                const existingItems = new Map();
+                document.querySelectorAll('.item').forEach(item => {
+                    const itemId = item.getAttribute('data-item-id');
+                    existingItems.set(itemId, item);
                 });
                 
-                // Add the fetched items
+                // Track which items we've processed to identify deleted items later
+                const processedItemIds = new Set();
+                
+                // Process the fetched items
                 const items = data.items || [];
                 items.forEach(item => {
-                    // Find the correct container
-                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                        .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                    const itemId = item.id || generateUUID();
+                    processedItemIds.add(itemId);
                     
-                    if (entityRow) {
-                        const riskColumn = entityRow.querySelector(
-                            item.risk_level === 'No' ? '.no-risk' :
-                            item.risk_level === 'At' ? '.at-risk' :
-                            '.high-risk'
-                        );
-                        
-                        if (riskColumn) {
-                            const container = riskColumn.querySelector('.items-container');
-                            const itemElement = document.createElement('div');
-                            itemElement.className = 'item';
-                            itemElement.setAttribute('draggable', 'true');
-                            itemElement.setAttribute('data-entity', item.entity);
-                            itemElement.setAttribute('data-risk', item.risk_level);
-                            itemElement.setAttribute('data-item-id', item.id || generateUUID());
-                            
-                            // Use empty string if rating is null, undefined, or empty
-                            const ratingValue = item.rating || '';
-                            
-                            itemElement.innerHTML = `
-                                <i class="bi bi-grip-vertical drag-handle"></i>
-                                <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
-                                <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
-                                <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
-                            `;
-                            container.appendChild(itemElement);
-                            
-                            // Add click handler to make text editable when clicked
-                            const textElement = itemElement.querySelector('.item-text');
-                            textElement.addEventListener('click', function() {
-                                if (textElement.getAttribute('contenteditable') === 'false') {
-                                    textElement.setAttribute('contenteditable', 'true');
-                                    textElement.focus();
-                                }
-                            });
-                            
-                            // Initialize drag and drop for this item
-                            initializeDragForItem(itemElement);
+                    // Check if this item already exists
+                    const existingItem = existingItems.get(itemId);
+                    
+                    if (existingItem) {
+                        // Update existing item if needed
+                        const textElement = existingItem.querySelector('.item-text');
+                        if (textElement.textContent !== item.text) {
+                            textElement.textContent = item.text;
                         }
+                        
+                        const ratingElement = existingItem.querySelector('.item-rating');
+                        const ratingValue = item.rating || '';
+                        if (ratingElement.textContent !== ratingValue) {
+                            ratingElement.textContent = ratingValue;
+                        }
+                        
+                        // Check if position, entity, or risk level changed
+                        const currentEntity = existingItem.getAttribute('data-entity');
+                        const currentRisk = existingItem.getAttribute('data-risk');
+                        
+                        if (currentEntity !== item.entity || currentRisk !== item.risk_level) {
+                            // Move item to the correct container
+                            const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                                .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                            
+                            if (entityRow) {
+                                const riskColumn = entityRow.querySelector(
+                                    item.risk_level === 'No' ? '.no-risk' :
+                                    item.risk_level === 'At' ? '.at-risk' :
+                                    '.high-risk'
+                                );
+                                
+                                if (riskColumn) {
+                                    const container = riskColumn.querySelector('.items-container');
+                                    
+                                    // Update data attributes
+                                    existingItem.setAttribute('data-entity', item.entity);
+                                    existingItem.setAttribute('data-risk', item.risk_level);
+                                    
+                                    // Move the item to the new container
+                                    container.appendChild(existingItem);
+                                }
+                            }
+                        }
+                    } else {
+                        // Create new item
+                        const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                            .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                        
+                        if (entityRow) {
+                            const riskColumn = entityRow.querySelector(
+                                item.risk_level === 'No' ? '.no-risk' :
+                                item.risk_level === 'At' ? '.at-risk' :
+                                '.high-risk'
+                            );
+                            
+                            if (riskColumn) {
+                                const container = riskColumn.querySelector('.items-container');
+                                const itemElement = document.createElement('div');
+                                itemElement.className = 'item';
+                                itemElement.setAttribute('draggable', 'true');
+                                itemElement.setAttribute('data-entity', item.entity);
+                                itemElement.setAttribute('data-risk', item.risk_level);
+                                itemElement.setAttribute('data-item-id', itemId);
+                                
+                                // Use empty string if rating is null, undefined, or empty
+                                const ratingValue = item.rating || '';
+                                
+                                itemElement.innerHTML = `
+                                    <i class="bi bi-grip-vertical drag-handle"></i>
+                                    <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
+                                    <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                                    <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                                `;
+                                container.appendChild(itemElement);
+                                
+                                // Add click handler to make text editable when clicked
+                                const textElement = itemElement.querySelector('.item-text');
+                                textElement.addEventListener('click', function() {
+                                    if (textElement.getAttribute('contenteditable') === 'false') {
+                                        textElement.setAttribute('contenteditable', 'true');
+                                        textElement.focus();
+                                    }
+                                });
+                                
+                                // Initialize drag and drop for this item
+                                initializeDragForItem(itemElement);
+                            }
+                        }
+                    }
+                });
+                
+                // Remove items that no longer exist in the data
+                existingItems.forEach((item, itemId) => {
+                    if (!processedItemIds.has(itemId)) {
+                        item.remove();
                     }
                 });
                 
