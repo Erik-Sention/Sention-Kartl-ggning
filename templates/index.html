@@ -968,8 +968,123 @@
                 return;
             }
             
-            // Reload data from server
-            location.reload();
+            // Instead of reloading the entire page, fetch only the updated data
+            fetch(`/get_items?category=${currentCategory}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateItemsInDOM(data.items);
+                    } else {
+                        console.error('Error fetching updated items:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching updated items:', error);
+                });
+        }
+        
+        // Function to update items in the DOM without reloading the page
+        function updateItemsInDOM(items) {
+            // Clear all existing items
+            document.querySelectorAll('.items-container').forEach(container => {
+                // Save any item that is currently being edited
+                const editingItems = Array.from(container.querySelectorAll('.item'))
+                    .filter(item => item.querySelector('.cell-editing') || item.querySelector('.cell-editing-other'));
+                
+                // Remove all other items
+                Array.from(container.querySelectorAll('.item'))
+                    .filter(item => !editingItems.includes(item))
+                    .forEach(item => item.remove());
+            });
+            
+            // Add updated items
+            items.forEach(item => {
+                if (item.category === currentCategory) {
+                    // Skip if this item is currently being edited
+                    const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+                    if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
+                        return;
+                    }
+                    
+                    // Find the correct container
+                    const entityRow = Array.from(document.querySelectorAll('.entity-row'))
+                        .find(row => row.querySelector('.entity-title').textContent === item.entity);
+                    
+                    if (entityRow) {
+                        const riskColumn = entityRow.querySelector(
+                            item.risk_level === 'No' ? '.no-risk' :
+                            item.risk_level === 'At' ? '.at-risk' :
+                            '.high-risk'
+                        );
+                        
+                        if (riskColumn) {
+                            const container = riskColumn.querySelector('.items-container');
+                            
+                            // Check if this item already exists
+                            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+                            if (existingItem) {
+                                // Update existing item
+                                const textElement = existingItem.querySelector('.item-text');
+                                const ratingElement = existingItem.querySelector('.item-rating');
+                                
+                                // Only update if not being edited
+                                if (!textElement.classList.contains('cell-editing') && !textElement.classList.contains('cell-editing-other')) {
+                                    textElement.textContent = item.text;
+                                }
+                                
+                                ratingElement.textContent = item.rating || '';
+                            } else {
+                                // Create new item
+                                const itemElement = document.createElement('div');
+                                itemElement.className = 'item';
+                                itemElement.setAttribute('draggable', 'true');
+                                itemElement.setAttribute('data-entity', item.entity);
+                                itemElement.setAttribute('data-risk', item.risk_level);
+                                itemElement.setAttribute('data-item-id', item.id || generateUUID());
+                                
+                                // Use empty string if rating is null, undefined, or empty
+                                const ratingValue = item.rating || '';
+                                
+                                itemElement.innerHTML = `
+                                    <i class="bi bi-grip-vertical drag-handle"></i>
+                                    <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
+                                    <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
+                                    <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
+                                `;
+                                
+                                // Add to container at the correct position
+                                const items = container.querySelectorAll('.item');
+                                if (items.length > item.position) {
+                                    container.insertBefore(itemElement, items[item.position]);
+                                } else {
+                                    container.appendChild(itemElement);
+                                }
+                                
+                                // Add click handler to make text editable when clicked
+                                const textElement = itemElement.querySelector('.item-text');
+                                textElement.addEventListener('click', function(e) {
+                                    // Prevent editing if cell is being edited by another user
+                                    if (textElement.classList.contains('cell-editing-other')) {
+                                        e.preventDefault();
+                                        return;
+                                    }
+                                    
+                                    if (textElement.getAttribute('contenteditable') === 'false') {
+                                        textElement.setAttribute('contenteditable', 'true');
+                                        textElement.focus();
+                                    }
+                                });
+                                
+                                // Initialize drag and drop for this item
+                                initializeDragForItem(itemElement);
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Re-apply editing indicators
+            applyEditingIndicators();
         }
         
         // Handle editing status updates
@@ -978,8 +1093,8 @@
             
             // If this is our own update, ignore it
             if (payload.payload.userId === sessionUserId) {
-                        return;
-                    }
+                return;
+            }
             
             const { userId, entityId, riskLevel, itemId, isEditing } = payload.payload;
             const cellKey = `${entityId}-${riskLevel}-${itemId}`;
@@ -994,6 +1109,10 @@
                     textCell.classList.add('cell-editing-other');
                     textCell.setAttribute('contenteditable', 'false'); // Prevent editing
                     
+                    // Remove any click handlers that might enable editing
+                    const newTextCell = textCell.cloneNode(true);
+                    textCell.parentNode.replaceChild(newTextCell, textCell);
+                    
                     // Store in our map of cells being edited
                     cellsBeingEditedByOthers.set(cellKey, userId);
                 } else {
@@ -1002,12 +1121,20 @@
                     textCell.setAttribute('contenteditable', 'false'); // Keep it non-editable by default
                     
                     // Add click handler to make it editable again when clicked
-                    textCell.addEventListener('click', function() {
+                    const newTextCell = textCell.cloneNode(true);
+                    newTextCell.addEventListener('click', function(e) {
+                        // Prevent editing if cell is being edited by another user
+                        if (textCell.classList.contains('cell-editing-other')) {
+                            e.preventDefault();
+                            return;
+                        }
+                        
                         if (textCell.getAttribute('contenteditable') === 'false') {
                             textCell.setAttribute('contenteditable', 'true');
                             textCell.focus();
                         }
                     });
+                    textCell.parentNode.replaceChild(newTextCell, textCell);
                     
                     // Remove from our map
                     cellsBeingEditedByOthers.delete(cellKey);
@@ -1045,7 +1172,13 @@
                 cell.setAttribute('contenteditable', 'false');
                 
                 // Add click handler to make it editable again when clicked
-                cell.addEventListener('click', function() {
+                cell.addEventListener('click', function(e) {
+                    // Prevent editing if cell is being edited by another user
+                    if (cell.classList.contains('cell-editing-other')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
                     if (cell.getAttribute('contenteditable') === 'false') {
                         cell.setAttribute('contenteditable', 'true');
                         cell.focus();
@@ -1110,7 +1243,13 @@
                 textElement.setAttribute('contenteditable', 'false');
                 
                 // Add click handler to make it editable again when clicked
-                textElement.addEventListener('click', function() {
+                textElement.addEventListener('click', function(e) {
+                    // Prevent editing if cell is being edited by another user
+                    if (textElement.classList.contains('cell-editing-other')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
                     if (textElement.getAttribute('contenteditable') === 'false') {
                         textElement.setAttribute('contenteditable', 'true');
                         textElement.focus();
@@ -1571,7 +1710,13 @@
                             
                             // Add click handler to make text editable when clicked
                             const textElement = itemElement.querySelector('.item-text');
-                            textElement.addEventListener('click', function() {
+                            textElement.addEventListener('click', function(e) {
+                                // Prevent editing if cell is being edited by another user
+                                if (textElement.classList.contains('cell-editing-other')) {
+                                    e.preventDefault();
+                                    return;
+                                }
+                                
                                 if (textElement.getAttribute('contenteditable') === 'false') {
                                     textElement.setAttribute('contenteditable', 'true');
                                     textElement.focus();
