@@ -945,6 +945,20 @@
                         handleEditingStatus(payload);
                     }
                 )
+                .on(
+                    'broadcast',
+                    { event: 'rating_change' },
+                    (payload) => {
+                        handleRatingChange(payload);
+                    }
+                )
+                .on(
+                    'broadcast',
+                    { event: 'item_deletion' },
+                    (payload) => {
+                        handleItemDeletion(payload);
+                    }
+                )
                 .subscribe();
                 
             // Set up a heartbeat to keep editing status alive
@@ -1146,7 +1160,7 @@
                 return;
             }
             
-            const { userId, entityId, riskLevel, itemId, isEditing } = payload.payload;
+            const { userId, entityId, riskLevel, itemId, isEditing, newText } = payload.payload;
             const cellKey = `${entityId}-${riskLevel}-${itemId}`;
             
             // Find the cell
@@ -1170,25 +1184,91 @@
                     textCell.classList.remove('cell-editing-other');
                     textCell.setAttribute('contenteditable', 'false'); // Keep it non-editable by default
                     
+                    // If we received new text, update the cell content
+                    if (newText !== undefined) {
+                        textCell.textContent = newText;
+                    }
+                    
                     // Add click handler to make it editable again when clicked
                     const newTextCell = textCell.cloneNode(true);
                     newTextCell.addEventListener('click', function(e) {
                         // Prevent editing if cell is being edited by another user
-                        if (textCell.classList.contains('cell-editing-other')) {
+                        if (newTextCell.classList.contains('cell-editing-other')) {
                             e.preventDefault();
                             return;
                         }
                         
-                        if (textCell.getAttribute('contenteditable') === 'false') {
-                            textCell.setAttribute('contenteditable', 'true');
-                            textCell.focus();
+                        if (newTextCell.getAttribute('contenteditable') === 'false') {
+                            newTextCell.setAttribute('contenteditable', 'true');
+                            newTextCell.focus();
                         }
                     });
                     textCell.parentNode.replaceChild(newTextCell, textCell);
                     
                     // Remove from our map
                     cellsBeingEditedByOthers.delete(cellKey);
+                    
+                    // Show a subtle notification that content was updated
+                    const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                    autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
+                    setTimeout(() => {
+                        autoSaveIndicator.innerHTML = '';
+                    }, 2000);
                 }
+            }
+        }
+        
+        // Handle rating change
+        function handleRatingChange(payload) {
+            console.log('Rating change update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { entityId, riskLevel, itemId, rating } = payload.payload;
+            
+            // Find the item
+            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"][data-item-id="${itemId}"]`);
+            if (item) {
+                const ratingCell = item.querySelector('.item-rating');
+                
+                // Update the rating
+                ratingCell.textContent = rating;
+                
+                // Show a subtle notification that content was updated
+                const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                autoSaveIndicator.innerHTML = 'Betyg uppdaterat';
+                setTimeout(() => {
+                    autoSaveIndicator.innerHTML = '';
+                }, 2000);
+            }
+        }
+        
+        // Handle item deletion
+        function handleItemDeletion(payload) {
+            console.log('Item deletion update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { entityId, riskLevel, itemId } = payload.payload;
+            
+            // Find the item
+            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"][data-item-id="${itemId}"]`);
+            if (item) {
+                // Remove the item from DOM
+                item.remove();
+                
+                // Show a subtle notification that content was updated
+                const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                autoSaveIndicator.innerHTML = 'Objekt borttaget';
+                setTimeout(() => {
+                    autoSaveIndicator.innerHTML = '';
+                }, 2000);
             }
         }
         
@@ -1200,6 +1280,9 @@
             const riskLevel = item.getAttribute('data-risk');
             const itemId = item.getAttribute('data-item-id');
             
+            // Include the new text when stopping editing
+            const newText = isEditing ? undefined : cell.textContent;
+            
             // Broadcast editing status
             supabaseClient.channel('editing_status').send({
                 type: 'broadcast',
@@ -1209,7 +1292,8 @@
                     entityId,
                     riskLevel,
                     itemId,
-                    isEditing
+                    isEditing,
+                    newText
                 }
             });
         }
@@ -1326,10 +1410,13 @@
         
         // Function to handle cell changes
         function handleCellChange(cell) {
+            // Get the new text content
+            const newText = cell.textContent.trim();
+            
             // Remove editing indicator
             cell.classList.remove('cell-editing');
             
-            // Broadcast that we stopped editing
+            // Broadcast that we stopped editing, including the new text
             broadcastEditingStatus(cell, false);
             
             // Clear currently editing cell if it's this one
@@ -1382,18 +1469,66 @@
                 document.getElementById('rating-selector').style.display = 'none';
                 document.removeEventListener('click', closeRatingSelectorOutside);
                 
+                // Broadcast the rating change to other users
+                broadcastRatingChange(currentRatingCell, rating);
+                
                 // Trigger auto-save
                 triggerAutoSave();
             }
         }
         
+        // Broadcast rating change
+        function broadcastRatingChange(cell, rating) {
+            // Find item and get its data attributes
+            const item = cell.closest('.item');
+            const entityId = item.getAttribute('data-entity');
+            const riskLevel = item.getAttribute('data-risk');
+            const itemId = item.getAttribute('data-item-id');
+            
+            // Broadcast rating change
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'rating_change',
+                payload: {
+                    userId: sessionUserId,
+                    entityId,
+                    riskLevel,
+                    itemId,
+                    rating
+                }
+            });
+        }
+        
         // Function to delete item
         function deleteItem(button) {
             const item = button.closest('.item');
+            const entityId = item.getAttribute('data-entity');
+            const riskLevel = item.getAttribute('data-risk');
+            const itemId = item.getAttribute('data-item-id');
+            
+            // Remove the item from DOM
             item.remove();
+            
+            // Broadcast the deletion to other users
+            broadcastItemDeletion(entityId, riskLevel, itemId);
             
             // Trigger auto-save
             triggerAutoSave();
+        }
+        
+        // Broadcast item deletion
+        function broadcastItemDeletion(entityId, riskLevel, itemId) {
+            // Broadcast deletion
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'item_deletion',
+                payload: {
+                    userId: sessionUserId,
+                    entityId,
+                    riskLevel,
+                    itemId
+                }
+            });
         }
         
         // Function to trigger auto-save with debounce
