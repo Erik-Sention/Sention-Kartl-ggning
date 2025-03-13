@@ -1002,7 +1002,29 @@
                     // Check if this item already exists in the DOM
                     const existingItem = document.querySelector(`.item[data-item-id="${newItem.id}"]`);
                     if (!existingItem) {
-                        addItemToDOM(newItem);
+                        // Check if there's an empty item that we can use instead of creating a new one
+                        const emptyItems = document.querySelectorAll(`.item[data-entity="${newItem.entity}"][data-risk="${newItem.risk_level}"]`);
+                        let foundEmptyItem = false;
+                        
+                        for (const item of emptyItems) {
+                            const textElement = item.querySelector('.item-text');
+                            const ratingElement = item.querySelector('.item-rating');
+                            
+                            // If we find an empty item, use that instead of creating a new one
+                            if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
+                                console.log('Found empty item, updating it with server data');
+                                item.setAttribute('data-item-id', newItem.id);
+                                textElement.textContent = newItem.text || '';
+                                ratingElement.textContent = newItem.rating || '';
+                                foundEmptyItem = true;
+                                break;
+                            }
+                        }
+                        
+                        // If we didn't find an empty item, create a new one
+                        if (!foundEmptyItem) {
+                            addItemToDOM(newItem);
+                        }
                         return;
                     } else {
                         // Item exists but might need updating
@@ -1039,14 +1061,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        updateItemsInDOM(data.items);
-                        
-                        // Show a subtle notification that content was updated
-                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
-                        autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
-                        setTimeout(() => {
-                            autoSaveIndicator.innerHTML = '';
-                        }, 2000);
+                        // Only update if we're not currently editing or saving
+                        if (!currentlyEditingCell && !isCurrentlySaving) {
+                            updateItemsInDOM(data.items);
+                            
+                            // Show a subtle notification that content was updated
+                            const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                            autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
+                            setTimeout(() => {
+                                autoSaveIndicator.innerHTML = '';
+                            }, 2000);
+                        }
                     } else {
                         console.error('Error fetching updated items:', data.message);
                     }
@@ -1080,9 +1105,6 @@
         
         // Function to trigger auto-save with debounce
         function triggerAutoSave() {
-            // Clean up empty items first
-            cleanupEmptyItems();
-            
             // Show saving indicator
             const autoSaveIndicator = document.getElementById('auto-save-indicator');
             autoSaveIndicator.innerHTML = '<span class="saving">Sparar...</span>';
@@ -1104,11 +1126,41 @@
             const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
             if (existingItem) {
                 console.log('Item already exists, updating instead of creating duplicate');
-                updateItemInDOM(item, {
-                    risk_level: existingItem.getAttribute('data-risk'),
-                    entity: existingItem.getAttribute('data-entity'),
-                    position: -1 // Force position update
-                });
+                // Only update if not being edited
+                const textElement = existingItem.querySelector('.item-text');
+                if (!textElement.classList.contains('cell-editing') && !textElement.classList.contains('cell-editing-other')) {
+                    updateItemInDOM(item, {
+                        risk_level: existingItem.getAttribute('data-risk'),
+                        entity: existingItem.getAttribute('data-entity'),
+                        position: -1 // Force position update
+                    });
+                }
+                return;
+            }
+            
+            // Check if there's an empty item that we can use instead of creating a new one
+            const emptyItems = document.querySelectorAll(`.item[data-entity="${item.entity}"][data-risk="${item.risk_level}"]`);
+            let foundEmptyItem = false;
+            
+            for (const emptyItem of emptyItems) {
+                const textElement = emptyItem.querySelector('.item-text');
+                const ratingElement = emptyItem.querySelector('.item-rating');
+                
+                // If we find an empty item, use that instead of creating a new one
+                if (!textElement.textContent.trim() && !ratingElement.textContent.trim() && 
+                    !textElement.classList.contains('cell-editing') && 
+                    !textElement.classList.contains('cell-editing-other')) {
+                    console.log('Found empty item, updating it with server data');
+                    emptyItem.setAttribute('data-item-id', item.id);
+                    textElement.textContent = item.text || '';
+                    ratingElement.textContent = item.rating || '';
+                    foundEmptyItem = true;
+                    break;
+                }
+            }
+            
+            // If we found and updated an empty item, return
+            if (foundEmptyItem) {
                 return;
             }
             
@@ -1139,13 +1191,13 @@
                     
                     itemElement.innerHTML = `
                         <i class="bi bi-grip-vertical drag-handle"></i>
-                        <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text}</div>
+                        <div class="item-text" contenteditable="false" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.text || ''}</div>
                         <div class="item-rating" onclick="showRatingSelector(this)">${ratingValue}</div>
                         <button class="delete-btn" onclick="deleteItem(this)"><i class="bi bi-trash"></i></button>
                     `;
                     
                     // Add to container at the correct position
-                    if (container.children.length > item.position) {
+                    if (container.children.length > item.position && item.position >= 0) {
                         container.insertBefore(itemElement, container.children[item.position]);
                     } else {
                         container.appendChild(itemElement);
@@ -1631,6 +1683,22 @@
             // Generate a unique ID for this item
             const itemId = generateUUID();
             
+            // Check if there's already an empty item in this container
+            // If so, focus on that instead of creating a new one
+            const existingEmptyItems = container.querySelectorAll('.item');
+            for (const existingItem of existingEmptyItems) {
+                const textElement = existingItem.querySelector('.item-text');
+                const ratingElement = existingItem.querySelector('.item-rating');
+                
+                // If we find an empty item, focus on it instead of creating a new one
+                if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
+                    console.log('Found empty item, focusing on it instead of creating a new one');
+                    textElement.setAttribute('contenteditable', 'true');
+                    textElement.focus();
+                    return;
+                }
+            }
+            
             // Create new item
             const item = document.createElement('div');
             item.className = 'item';
@@ -1737,6 +1805,8 @@
                 if (!ratingElement.textContent.trim()) {
                     // This is an empty item, remove it
                     item.remove();
+                    // Still trigger auto-save to remove it from the database
+                    triggerAutoSave();
                 } else {
                     // There's a rating but no text, still save
                     triggerAutoSave();
@@ -1863,6 +1933,9 @@
                 // Set flag that we're saving
                 isCurrentlySaving = true;
                 
+                // Clean up empty items before collecting data
+                cleanupEmptyItems();
+                
                 const itemsData = collectItemsData();
                 
                 console.log('Saving items to database:', itemsData);
@@ -1892,20 +1965,61 @@
                     autoSaveIndicator.innerHTML = '';
                 }, 2000);
                 
+                // If we have updated items from the server, update our DOM with the server's version
+                // This ensures we're in sync with the database and prevents duplicates
+                if (data.items && Array.isArray(data.items)) {
+                    console.log('Received updated items from server:', data.items);
+                    
+                    // Only update the DOM if we're not currently editing
+                    if (!currentlyEditingCell) {
+                        // Create a map of existing items for quick lookup
+                        const existingItemsMap = new Map();
+                        document.querySelectorAll('.item').forEach(item => {
+                            const itemId = item.getAttribute('data-item-id');
+                            existingItemsMap.set(itemId, item);
+                        });
+                        
+                        // Create a map of server items for quick lookup
+                        const serverItemsMap = new Map();
+                        data.items.forEach(item => {
+                            serverItemsMap.set(item.id, item);
+                        });
+                        
+                        // Remove items that don't exist on the server
+                        existingItemsMap.forEach((domItem, itemId) => {
+                            if (!serverItemsMap.has(itemId)) {
+                                // This item doesn't exist on the server, remove it from DOM
+                                domItem.remove();
+                            }
+                        });
+                        
+                        // Update or add items from the server
+                        data.items.forEach(serverItem => {
+                            const domItem = document.querySelector(`.item[data-item-id="${serverItem.id}"]`);
+                            
+                            if (domItem) {
+                                // Update existing item attributes to match server
+                                const currentRiskLevel = domItem.getAttribute('data-risk');
+                                const currentEntity = domItem.getAttribute('data-entity');
+                                
+                                // Only update if risk level or entity has changed
+                                if (currentRiskLevel !== serverItem.risk_level || currentEntity !== serverItem.entity) {
+                                    updateItemInDOM(serverItem, {
+                                        risk_level: currentRiskLevel,
+                                        entity: currentEntity,
+                                        position: -1
+                                    });
+                                }
+                            } else {
+                                // This is a new item from the server, add it to the DOM
+                                addItemToDOM(serverItem);
+                            }
+                        });
+                    }
+                }
+                
                 // Reset saving flag
                 isCurrentlySaving = false;
-                
-                // If we have updated items with new IDs from the server, update our DOM
-                if (data.items && Array.isArray(data.items)) {
-                    // Update any temporary IDs with permanent ones from the server
-                    data.items.forEach(serverItem => {
-                        const domItem = document.querySelector(`.item[data-item-id="${serverItem.id}"]`);
-                        if (!domItem) {
-                            // This is a new item from the server, add it to the DOM
-                            addItemToDOM(serverItem);
-                        }
-                    });
-                }
                 
             } catch (error) {
                 console.error('Error saving data:', error);
@@ -2494,6 +2608,21 @@
             if (existingItem) {
                 console.log('Item already exists, not creating duplicate');
                 return;
+            }
+            
+            // Also check if there's an item with the same entity and risk level that's empty
+            // This helps prevent duplicates when a user is still editing a newly created item
+            const emptyItems = document.querySelectorAll(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"]`);
+            for (const item of emptyItems) {
+                const textElement = item.querySelector('.item-text');
+                const ratingElement = item.querySelector('.item-rating');
+                
+                // If we find an empty item, use that instead of creating a new one
+                if (!textElement.textContent.trim() && !ratingElement.textContent.trim()) {
+                    console.log('Found empty item, using it instead of creating a new one');
+                    item.setAttribute('data-item-id', itemId);
+                    return;
+                }
             }
             
             // Find the correct container
