@@ -266,6 +266,26 @@
             z-index: 100;
         }
 
+        /* Cell being edited by another user */
+        .cell-editing-other {
+            background-color: rgba(255, 0, 0, 0.1) !important;
+            position: relative;
+        }
+
+        .cell-editing-other::after {
+            content: "Redigeras av annan användare";
+            position: absolute;
+            top: -20px;
+            left: 0;
+            background-color: rgba(220, 53, 69, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
         /* Status message styles */
         .status-message {
             margin-top: 15px;
@@ -743,7 +763,7 @@
     <div id="drag-hint" class="drag-hint" style="display: none;">
         <i class="bi bi-lightbulb"></i>
         <div class="drag-hint-content">
-            <span id="drag-hint-text">Du kan dra i handtaget <i class="bi bi-grip-vertical"></i> för att ändra ordning på objekten</span>
+            <span id="drag-hint-text">Du kan dra i cellen för att ändra ordning på objekten</span>
             <div class="tip-navigation">
                 <button class="tip-nav-btn" onclick="previousTip()"><i class="bi bi-chevron-left"></i></button>
                 <span class="tip-counter"><span id="current-tip">1</span>/<span id="total-tips">6</span></span>
@@ -870,18 +890,197 @@
         let currentlyEditingCell = null;
         let isCurrentlySaving = false;
         
+        // Track cells being edited by other users
+        const cellsBeingEditedByOthers = new Map(); // Map of "entityId-riskLevel-itemId" to user ID
+        
+        // Generate a unique user ID for this session
+        const sessionUserId = generateUUID();
+        
         // Drag and drop variables
         let draggedItem = null;
+        
+        // Set up Supabase realtime subscription
+        function setupRealtimeSubscription() {
+            console.log("Setting up realtime subscription...");
+            
+            // Subscribe to changes in the items table
+            const channel = supabaseClient.channel('items_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+                        schema: 'public',
+                        table: 'items'
+                    },
+                    (payload) => {
+                        console.log('Change received!', payload);
+                        // Only reload if we're not currently saving
+                        if (!isCurrentlySaving) {
+                            handleRealtimeChange(payload);
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Subscription status:', status);
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Successfully subscribed to realtime changes!');
+                    }
+                });
+                
+            // Also subscribe to the editing status channel
+            const editingChannel = supabaseClient.channel('editing_status')
+                .on(
+                    'broadcast',
+                    { event: 'editing' },
+                    (payload) => {
+                        handleEditingStatus(payload);
+                    }
+                )
+                .subscribe();
+                
+            // Set up a heartbeat to keep editing status alive
+            setInterval(() => {
+                if (currentlyEditingCell) {
+                    // Re-broadcast our editing status every 5 seconds to keep it alive
+                    broadcastEditingStatus(currentlyEditingCell, true);
+                }
+            }, 5000);
+            
+            return [channel, editingChannel];
+        }
+        
+        // Handle realtime changes
+        function handleRealtimeChange(payload) {
+            console.log('Handling realtime change:', payload);
+            
+            // Don't reload if we're currently editing a cell
+            if (currentlyEditingCell) {
+                console.log('Not reloading because user is editing a cell');
+                return;
+            }
+            
+            // Reload data from server
+            location.reload();
+        }
+        
+        // Handle editing status updates
+        function handleEditingStatus(payload) {
+            console.log('Editing status update:', payload);
+            
+            // If this is our own update, ignore it
+            if (payload.payload.userId === sessionUserId) {
+                return;
+            }
+            
+            const { userId, entityId, riskLevel, itemId, isEditing } = payload.payload;
+            const cellKey = `${entityId}-${riskLevel}-${itemId}`;
+            
+            // Find the cell
+            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"][data-item-id="${itemId}"]`);
+            if (item) {
+                const textCell = item.querySelector('.item-text');
+                
+                if (isEditing) {
+                    // Another user is editing this cell
+                    textCell.classList.add('cell-editing-other');
+                    textCell.setAttribute('contenteditable', 'false'); // Prevent editing
+                    
+                    // Store in our map of cells being edited
+                    cellsBeingEditedByOthers.set(cellKey, userId);
+                } else {
+                    // User stopped editing
+                    textCell.classList.remove('cell-editing-other');
+                    textCell.setAttribute('contenteditable', 'false'); // Keep it non-editable by default
+                    
+                    // Add click handler to make it editable again when clicked
+                    textCell.addEventListener('click', function() {
+                        if (textCell.getAttribute('contenteditable') === 'false') {
+                            textCell.setAttribute('contenteditable', 'true');
+                            textCell.focus();
+                        }
+                    });
+                    
+                    // Remove from our map
+                    cellsBeingEditedByOthers.delete(cellKey);
+                }
+            }
+        }
+        
+        // Broadcast editing status
+        function broadcastEditingStatus(cell, isEditing) {
+            // Find item and get its data attributes
+            const item = cell.closest('.item');
+            const entityId = item.getAttribute('data-entity');
+            const riskLevel = item.getAttribute('data-risk');
+            const itemId = item.getAttribute('data-item-id');
+            
+            // Broadcast editing status
+            supabaseClient.channel('editing_status').send({
+                type: 'broadcast',
+                event: 'editing',
+                payload: {
+                    userId: sessionUserId,
+                    entityId,
+                    riskLevel,
+                    itemId,
+                    isEditing
+                }
+            });
+        }
+        
+        // Apply editing indicators for cells being edited by others
+        function applyEditingIndicators() {
+            // Clear all existing indicators first
+            document.querySelectorAll('.cell-editing-other').forEach(cell => {
+                cell.classList.remove('cell-editing-other');
+                cell.setAttribute('contenteditable', 'false');
+                
+                // Add click handler to make it editable again when clicked
+                cell.addEventListener('click', function() {
+                    if (cell.getAttribute('contenteditable') === 'false') {
+                        cell.setAttribute('contenteditable', 'true');
+                        cell.focus();
+                    }
+                });
+            });
+            
+            // Apply indicators for cells being edited by others
+            cellsBeingEditedByOthers.forEach((userId, cellKey) => {
+                const [entityId, riskLevel, itemId] = cellKey.split('-');
+                
+                const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${riskLevel}"][data-item-id="${itemId}"]`);
+                if (item) {
+                    const textCell = item.querySelector('.item-text');
+                    textCell.classList.add('cell-editing-other');
+                    textCell.setAttribute('contenteditable', 'false'); // Prevent editing
+                }
+            });
+        }
+
+        // Generate UUID for session
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
 
         // Function to add new item
         function addNewItem(button, entity, riskLevel) {
             const column = button.closest('.risk-column');
             const container = column.querySelector('.items-container');
             
+            // Generate a unique ID for this item
+            const itemId = generateUUID();
+            
             // Create new item
             const item = document.createElement('div');
             item.className = 'item';
             item.setAttribute('draggable', 'true');
+            item.setAttribute('data-entity', entity);
+            item.setAttribute('data-risk', riskLevel);
+            item.setAttribute('data-item-id', itemId);
             item.innerHTML = `
                 <i class="bi bi-grip-vertical drag-handle"></i>
                 <div class="item-text" contenteditable="true" data-placeholder="Skriv text här" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></div>
@@ -916,158 +1115,24 @@
             // Trigger auto-save
             triggerAutoSave();
         }
-        
-        // Initialize drag and drop for an item
-        function initializeDragForItem(item) {
-            item.addEventListener('dragstart', handleDragStart);
-            item.addEventListener('dragend', handleDragEnd);
-            item.addEventListener('dragover', handleDragOver);
-            item.addEventListener('drop', handleDrop);
-        }
-        
-        // Drag and drop event handlers
-        function handleDragStart(e) {
-            // Only allow dragging if we're not editing a cell
-            if (currentlyEditingCell) {
-                e.preventDefault();
-                return;
-            }
-            
-            draggedItem = this;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', ''); // Required for Firefox
-        }
-        
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            
-            // Remove drag-over class from all items
-            const items = document.querySelectorAll('.item');
-            items.forEach(item => item.classList.remove('drag-over'));
-            
-            // Remove drag-over class from all containers
-            const containers = document.querySelectorAll('.items-container');
-            containers.forEach(container => container.classList.remove('container-drag-over'));
-            
-            draggedItem = null;
-        }
-        
-        function handleDragOver(e) {
-            if (e.preventDefault) {
-                e.preventDefault();
-            }
-            
-            // Don't allow dragging if any cell is being edited
-            if (currentlyEditingCell) {
-                return;
-            }
-            
-            // Handle drag over items
-            const item = e.target.closest('.item');
-            if (item && item !== draggedItem) {
-                // Remove drag-over class from all items
-                const items = document.querySelectorAll('.item');
-                items.forEach(i => i.classList.remove('drag-over'));
-                
-                // Get mouse position relative to the item
-                const rect = item.getBoundingClientRect();
-                const mouseY = e.clientY;
-                const threshold = rect.top + (rect.height / 2);
-                
-                // Add drag-over class to the appropriate item
-                if (mouseY < threshold) {
-                    item.classList.add('drag-over');
-                } else {
-                    // If mouse is in bottom half, add class to next item if it exists
-                    const nextItem = item.nextElementSibling;
-                    if (nextItem) {
-                        nextItem.classList.add('drag-over');
-                    } else {
-                        // If there's no next item, add class to current item
-                        item.classList.add('drag-over');
-                    }
-                }
-            }
-            // Handle drag over empty containers
-            else {
-                const container = e.target.closest('.items-container');
-                if (container && (!container.contains(draggedItem) || container.children.length === 0)) {
-                    // Remove drag-over class from all containers
-                    const containers = document.querySelectorAll('.items-container');
-                    containers.forEach(c => c.classList.remove('container-drag-over'));
-                    
-                    // Add drag-over class to this container
-                    container.classList.add('container-drag-over');
-                }
-            }
-            
-            return false;
-        }
-        
-        function handleDrop(e) {
-            if (e.stopPropagation) {
-                e.stopPropagation();
-            }
-            
-            // Don't allow dropping if any cell is being edited
-            if (currentlyEditingCell) {
-                return;
-            }
-            
-            // Handle drop on items
-            const item = e.target.closest('.item');
-            if (draggedItem && item && item !== draggedItem) {
-                // Get mouse position relative to the item
-                const rect = item.getBoundingClientRect();
-                const mouseY = e.clientY;
-                const threshold = rect.top + (rect.height / 2);
-                
-                // Remove drag-over class
-                item.classList.remove('drag-over');
-                
-                // Get the container
-                const container = item.parentNode;
-                
-                // Insert the item based on mouse position
-                if (mouseY < threshold) {
-                    container.insertBefore(draggedItem, item);
-                } else {
-                    container.insertBefore(draggedItem, item.nextSibling);
-                }
-                
-                // Trigger auto-save to save the new order
-                triggerAutoSave();
-            }
-            // Handle drop on empty containers
-            else {
-                const container = e.target.closest('.items-container');
-                if (draggedItem && container) {
-                    // Remove container drag-over class
-                    container.classList.remove('container-drag-over');
-                    
-                    // Append to the container
-                    container.appendChild(draggedItem);
-                    
-                    // Trigger auto-save to save the new order and risk level
-                    triggerAutoSave();
-                }
-            }
-            
-            return false;
-        }
 
         // Function to handle cell focus
         function handleCellFocus(cell) {
             // Mark this cell as being edited
             currentlyEditingCell = cell;
             cell.classList.add('cell-editing');
+            
+            // Broadcast editing status
+            broadcastEditingStatus(cell, true);
         }
         
         // Function to handle cell changes
         function handleCellChange(cell) {
             // Remove editing indicator
             cell.classList.remove('cell-editing');
+            
+            // Broadcast that we stopped editing
+            broadcastEditingStatus(cell, false);
             
             // Clear currently editing cell if it's this one
             if (currentlyEditingCell === cell) {
@@ -1265,6 +1330,146 @@
             }
         }
         
+        // Initialize drag and drop for an item
+        function initializeDragForItem(item) {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+            item.addEventListener('dragover', handleDragOver);
+            item.addEventListener('drop', handleDrop);
+        }
+
+        // Drag and drop event handlers
+        function handleDragStart(e) {
+            // Only allow dragging if we're not editing a cell
+            if (currentlyEditingCell) {
+                e.preventDefault();
+                return;
+            }
+            
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            // Remove drag-over class from all items
+            const items = document.querySelectorAll('.item');
+            items.forEach(item => item.classList.remove('drag-over'));
+            
+            // Remove drag-over class from all containers
+            const containers = document.querySelectorAll('.items-container');
+            containers.forEach(container => container.classList.remove('container-drag-over'));
+            
+            draggedItem = null;
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            // Don't allow dragging if any cell is being edited
+            if (currentlyEditingCell) {
+                return;
+            }
+            
+            // Handle drag over items
+            const item = e.target.closest('.item');
+            if (item && item !== draggedItem) {
+                // Remove drag-over class from all items
+                const items = document.querySelectorAll('.item');
+                items.forEach(i => i.classList.remove('drag-over'));
+                
+                // Get mouse position relative to the item
+                const rect = item.getBoundingClientRect();
+                const mouseY = e.clientY;
+                const threshold = rect.top + (rect.height / 2);
+                
+                // Add drag-over class to the appropriate item
+                if (mouseY < threshold) {
+                    item.classList.add('drag-over');
+                } else {
+                    // If mouse is in bottom half, add class to next item if it exists
+                    const nextItem = item.nextElementSibling;
+                    if (nextItem) {
+                        nextItem.classList.add('drag-over');
+                    } else {
+                        // If there's no next item, add class to current item
+                        item.classList.add('drag-over');
+                    }
+                }
+            }
+            // Handle drag over empty containers
+            else {
+                const container = e.target.closest('.items-container');
+                if (container && (!container.contains(draggedItem) || container.children.length === 0)) {
+                    // Remove drag-over class from all containers
+                    const containers = document.querySelectorAll('.items-container');
+                    containers.forEach(c => c.classList.remove('container-drag-over'));
+                    
+                    // Add drag-over class to this container
+                    container.classList.add('container-drag-over');
+                }
+            }
+            
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            // Don't allow dropping if any cell is being edited
+            if (currentlyEditingCell) {
+                return;
+            }
+            
+            // Handle drop on items
+            const item = e.target.closest('.item');
+            if (draggedItem && item && item !== draggedItem) {
+                // Get mouse position relative to the item
+                const rect = item.getBoundingClientRect();
+                const mouseY = e.clientY;
+                const threshold = rect.top + (rect.height / 2);
+                
+                // Remove drag-over class
+                item.classList.remove('drag-over');
+                
+                // Get the container
+                const container = item.parentNode;
+                
+                // Insert the item based on mouse position
+                if (mouseY < threshold) {
+                    container.insertBefore(draggedItem, item);
+                } else {
+                    container.insertBefore(draggedItem, item.nextSibling);
+                }
+                
+                // Trigger auto-save to save the new order
+                triggerAutoSave();
+            }
+            // Handle drop on empty containers
+            else {
+                const container = e.target.closest('.items-container');
+                if (draggedItem && container) {
+                    // Remove container drag-over class
+                    container.classList.remove('container-drag-over');
+                    
+                    // Append to the container
+                    container.appendChild(draggedItem);
+                    
+                    // Trigger auto-save to save the new order and risk level
+                    triggerAutoSave();
+                }
+            }
+            
+            return false;
+        }
+
         // Initialize drag and drop for all containers
         function initializeDragAndDrop() {
             // Initialize items
@@ -1317,7 +1522,7 @@
                 });
             });
         }
-        
+
         // Load saved items when page loads
         document.addEventListener('DOMContentLoaded', function() {
             const savedItems = JSON.parse('{{ saved_items_json | safe }}' || '[]');
@@ -1340,6 +1545,9 @@
                             const itemElement = document.createElement('div');
                             itemElement.className = 'item';
                             itemElement.setAttribute('draggable', 'true');
+                            itemElement.setAttribute('data-entity', item.entity);
+                            itemElement.setAttribute('data-risk', item.risk_level);
+                            itemElement.setAttribute('data-item-id', item.id || generateUUID());
                             
                             // Use empty string if rating is null, undefined, or empty
                             const ratingValue = item.rating || '';
@@ -1366,6 +1574,23 @@
                         }
                     }
                 }
+            });
+            
+            // Set up realtime subscription
+            const channels = setupRealtimeSubscription();
+            
+            // Clean up subscription when page unloads
+            window.addEventListener('beforeunload', () => {
+                console.log('Cleaning up subscription...');
+                
+                // Broadcast that we stopped editing any cell
+                if (currentlyEditingCell) {
+                    broadcastEditingStatus(currentlyEditingCell, false);
+                }
+                
+                channels.forEach(channel => {
+                    supabaseClient.removeChannel(channel);
+                });
             });
             
             // Initialize drag and drop for all containers
@@ -1475,7 +1700,7 @@
         
         // Tips array
         const tips = [
-            "Du kan dra i handtaget <i class=\"bi bi-grip-vertical\"></i> för att ändra ordning på objekten.",
+            "Du kan dra i cellen för att ändra ordning på objekten.",
             "Klicka på texten för att redigera den.",
             "Klicka på betygsområdet för att välja ett betyg.",
             "Ändringar sparas automatiskt när du slutar redigera.",
