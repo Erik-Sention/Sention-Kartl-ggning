@@ -974,6 +974,13 @@
                 .then(data => {
                     if (data.status === 'success') {
                         updateItemsInDOM(data.items);
+                        
+                        // Show a subtle notification that content was updated
+                        const autoSaveIndicator = document.getElementById('auto-save-indicator');
+                        autoSaveIndicator.innerHTML = 'Innehåll uppdaterat';
+                        setTimeout(() => {
+                            autoSaveIndicator.innerHTML = '';
+                        }, 2000);
                     } else {
                         console.error('Error fetching updated items:', data.message);
                     }
@@ -985,23 +992,27 @@
         
         // Function to update items in the DOM without reloading the page
         function updateItemsInDOM(items) {
-            // Clear all existing items
-            document.querySelectorAll('.items-container').forEach(container => {
-                // Save any item that is currently being edited
-                const editingItems = Array.from(container.querySelectorAll('.item'))
-                    .filter(item => item.querySelector('.cell-editing') || item.querySelector('.cell-editing-other'));
-                
-                // Remove all other items
-                Array.from(container.querySelectorAll('.item'))
-                    .filter(item => !editingItems.includes(item))
-                    .forEach(item => item.remove());
+            // Create a map of existing items for quick lookup
+            const existingItemsMap = new Map();
+            document.querySelectorAll('.item').forEach(item => {
+                const itemId = item.getAttribute('data-item-id');
+                existingItemsMap.set(itemId, item);
             });
             
-            // Add updated items
+            // Create a map of updated items
+            const updatedItemsMap = new Map();
             items.forEach(item => {
                 if (item.category === currentCategory) {
-                    // Skip if this item is currently being edited
+                    updatedItemsMap.set(item.id, item);
+                }
+            });
+            
+            // First pass: Update or add items
+            items.forEach(item => {
+                if (item.category === currentCategory) {
                     const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
+                    
+                    // Skip if this item is currently being edited
                     if (existingItem && (existingItem.querySelector('.cell-editing') || existingItem.querySelector('.cell-editing-other'))) {
                         return;
                     }
@@ -1020,10 +1031,37 @@
                         if (riskColumn) {
                             const container = riskColumn.querySelector('.items-container');
                             
-                            // Check if this item already exists
-                            const existingItem = document.querySelector(`.item[data-item-id="${item.id}"]`);
                             if (existingItem) {
-                                // Update existing item
+                                // Check if the item needs to be moved to a different container
+                                const currentContainer = existingItem.parentNode;
+                                const currentRiskLevel = existingItem.getAttribute('data-risk');
+                                
+                                if (currentRiskLevel !== item.risk_level) {
+                                    // Item has moved to a different risk level
+                                    existingItem.remove();
+                                    existingItem.setAttribute('data-risk', item.risk_level);
+                                    
+                                    // Add to new container at the correct position
+                                    if (container.children.length > item.position) {
+                                        container.insertBefore(existingItem, container.children[item.position]);
+                                    } else {
+                                        container.appendChild(existingItem);
+                                    }
+                                } else if (currentContainer === container) {
+                                    // Item is in the correct container, but might need reordering
+                                    const currentIndex = Array.from(container.children).indexOf(existingItem);
+                                    if (currentIndex !== item.position) {
+                                        // Remove and reinsert at the correct position
+                                        existingItem.remove();
+                                        if (container.children.length > item.position) {
+                                            container.insertBefore(existingItem, container.children[item.position]);
+                                        } else {
+                                            container.appendChild(existingItem);
+                                        }
+                                    }
+                                }
+                                
+                                // Update content
                                 const textElement = existingItem.querySelector('.item-text');
                                 const ratingElement = existingItem.querySelector('.item-rating');
                                 
@@ -1053,9 +1091,8 @@
                                 `;
                                 
                                 // Add to container at the correct position
-                                const items = container.querySelectorAll('.item');
-                                if (items.length > item.position) {
-                                    container.insertBefore(itemElement, items[item.position]);
+                                if (container.children.length > item.position) {
+                                    container.insertBefore(itemElement, container.children[item.position]);
                                 } else {
                                     container.appendChild(itemElement);
                                 }
@@ -1080,6 +1117,19 @@
                             }
                         }
                     }
+                }
+            });
+            
+            // Second pass: Remove items that no longer exist in the updated data
+            existingItemsMap.forEach((itemElement, itemId) => {
+                // Skip if this item is currently being edited
+                if (itemElement.querySelector('.cell-editing') || itemElement.querySelector('.cell-editing-other')) {
+                    return;
+                }
+                
+                // If the item doesn't exist in the updated data, remove it
+                if (!updatedItemsMap.has(itemId)) {
+                    itemElement.remove();
                 }
             });
             
