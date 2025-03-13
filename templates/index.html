@@ -2555,6 +2555,54 @@
                 }
             }
         }
+
+        // Function to collect all items data
+        function collectItemsData() {
+            const items = [];
+            
+            // Get all entity rows
+            const entityRows = document.querySelectorAll('.entity-row');
+            
+            entityRows.forEach(entityRow => {
+                const entity = entityRow.querySelector('.entity-title').textContent;
+                
+                // Get all risk columns in this entity row
+                const riskColumns = entityRow.querySelectorAll('.risk-column');
+                
+                riskColumns.forEach(column => {
+                    // Determine risk level
+                    let riskLevel = 'Unknown';
+                    if (column.classList.contains('no-risk')) riskLevel = 'No';
+                    if (column.classList.contains('at-risk')) riskLevel = 'At';
+                    if (column.classList.contains('high-risk')) riskLevel = 'High';
+                    
+                    // Get all items in this column
+                    const itemElements = column.querySelectorAll('.item');
+                    
+                    itemElements.forEach((item, index) => {
+                        const text = item.querySelector('.item-text').textContent.trim();
+                        const rating = item.querySelector('.item-rating').textContent.trim();
+                        const itemId = item.getAttribute('data-item-id');
+                        
+                        // Only include items that have either text or rating
+                        if (text || rating) {
+                            items.push({
+                                id: itemId,
+                                text: text,
+                                entity: entity,
+                                risk_level: riskLevel,
+                                category: currentCategory,
+                                rating: rating,
+                                position: index
+                            });
+                        }
+                    });
+                });
+            });
+            
+            console.log('Collected items for saving:', items);
+            return items;
+        }
     </script>
 </body>
 </html>
