@@ -384,12 +384,12 @@ def organisation_redirect():
 def foretagsledning_redirect():
     return redirect(url_for('home', category='foretagsledning'))
 
-@app.route('/managers-l6')
+@app.route('/managers')
 @login_required
 def managers_redirect():
     return redirect(url_for('home', category='managers'))
 
-@app.route('/supervisors-ac')
+@app.route('/supervisors')
 @login_required
 def supervisors_redirect():
     return redirect(url_for('home', category='supervisors'))
