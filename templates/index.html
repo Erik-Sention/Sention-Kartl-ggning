@@ -1684,7 +1684,7 @@
                         return;
                     }
                     
-                    // Find the correct container
+                    // Find the correct entity row for this item
                     const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === item.entity);
             
@@ -1702,10 +1702,20 @@
                                 // Check if the item needs to be moved to a different container
                                 const currentContainer = existingItem.parentNode;
                                 const currentRiskLevel = existingItem.getAttribute('data-risk');
+                                const currentEntityId = existingItem.getAttribute('data-entity');
                                 
-                                if (currentRiskLevel !== item.risk_level) {
-                                    // Item has moved to a different risk level
+                                const entityChanged = currentEntityId !== item.entity;
+                                const riskLevelChanged = currentRiskLevel !== item.risk_level;
+                                
+                                if (entityChanged || riskLevelChanged) {
+                                    // Item has moved to a different entity or risk level
+                                    console.log(`Item ${item.id} moved from ${currentEntityId}/${currentRiskLevel} to ${item.entity}/${item.risk_level}`);
+                                    
+                                    // Remove from old container
                                     existingItem.remove();
+                                    
+                                    // Update entity and risk level attributes
+                                    existingItem.setAttribute('data-entity', item.entity);
                                     existingItem.setAttribute('data-risk', item.risk_level);
                                     
                                     // Add to new container at the correct position
@@ -1799,7 +1809,11 @@
                                 // Initialize drag and drop for this item
                                 initializeDragForItem(itemElement);
                             }
+                        } else {
+                            console.error(`Risk column not found for item with risk level ${item.risk_level}`);
                         }
+                    } else {
+                        console.error(`Entity row not found for entity: ${item.entity}`);
                     }
                 }
             });
@@ -2732,69 +2746,70 @@
             
             // Get original position and risk level before moving
             const originalRiskLevel = draggedItem.getAttribute('data-risk');
-            const entityId = draggedItem.getAttribute('data-entity');
+            const originalEntityId = draggedItem.getAttribute('data-entity');
             const originalContainer = draggedItem.parentNode;
             // Get original position before any DOM changes
             const originalPosition = Array.from(originalContainer.children).indexOf(draggedItem);
             
-            console.log(`Original position: ${originalPosition}, Risk level: ${originalRiskLevel}, Entity: ${entityId}`);
+            console.log(`Original position: ${originalPosition}, Risk level: ${originalRiskLevel}, Entity: ${originalEntityId}`);
             
             // Handle drop on items
             const targetItem = e.target.closest('.item');
             if (targetItem && targetItem !== draggedItem) {
+                console.log('Dropping on item:', targetItem);
+                
                 // Get mouse position relative to the item
                 const rect = targetItem.getBoundingClientRect();
                 const mouseY = e.clientY;
                 const threshold = rect.top + (rect.height / 2);
                 
+                // Get target item's container, risk level, and entity
+                const targetContainer = targetItem.parentNode;
+                const targetRiskLevel = targetItem.getAttribute('data-risk');
+                const targetEntityId = targetItem.getAttribute('data-entity');
+                
+                console.log(`Target risk level: ${targetRiskLevel}, Target entity: ${targetEntityId}`);
+                
                 // Remove drag-over class
                 targetItem.classList.remove('drag-over');
                 
-                // Get the container
-                const container = targetItem.parentNode;
+                // Check if we need to change both risk level and entity
+                const riskLevelChanged = originalRiskLevel !== targetRiskLevel;
+                const entityChanged = originalEntityId !== targetEntityId;
                 
-                // Store current children before any DOM changes
-                const oldChildren = Array.from(container.children);
-                const targetIndex = oldChildren.indexOf(targetItem);
-                
-                // Store if we're in the same container (important for reordering logic)
-                const sameContainer = (container === originalContainer);
-                console.log(`Same container: ${sameContainer}, Target index: ${targetIndex}`);
-                
-                // Temporarily detach the dragged item to avoid position calculation issues
+                // Temporarily detach the dragged item
                 draggedItem.remove();
                 
-                // Insert the item based on mouse position
-                let newPosition;
+                // Insert the dragged item before or after the target item
                 if (mouseY < threshold) {
-                    // Insert before target item
-                    container.insertBefore(draggedItem, targetItem);
-                    newPosition = Array.from(container.children).indexOf(draggedItem);
+                    targetContainer.insertBefore(draggedItem, targetItem);
                 } else {
-                    // Insert after target item
-                    container.insertBefore(draggedItem, targetItem.nextSibling);
-                    newPosition = Array.from(container.children).indexOf(draggedItem);
+                    targetContainer.insertBefore(draggedItem, targetItem.nextSibling);
                 }
                 
+                // Calculate the new position
+                const newPosition = Array.from(targetContainer.children).indexOf(draggedItem);
                 console.log(`New position: ${newPosition}`);
                 
-                // Get new risk level after moving
-                const riskColumn = container.closest('.risk-column');
-                let newRiskLevel = originalRiskLevel;
-                if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
-                if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
-                if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
-                
-                // Update the risk level attribute if it changed
-                if (newRiskLevel !== originalRiskLevel) {
-                    console.log(`Risk level changed from ${originalRiskLevel} to ${newRiskLevel}`);
-                    draggedItem.setAttribute('data-risk', newRiskLevel);
+                // Update the risk level and entity if changed
+                if (riskLevelChanged || entityChanged) {
+                    console.log(`Risk level changed: ${riskLevelChanged}, Entity changed: ${entityChanged}`);
                     
-                    // Broadcast the move to other users, including the position
+                    if (riskLevelChanged) {
+                        draggedItem.setAttribute('data-risk', targetRiskLevel);
+                    }
+                    
+                    if (entityChanged) {
+                        console.log(`Entity changed from ${originalEntityId} to ${targetEntityId}`);
+                        draggedItem.setAttribute('data-entity', targetEntityId);
+                    }
+                    
+                    // Broadcast the move to other users, including entity change
                     broadcastItemMove(
-                        entityId,
+                        originalEntityId,
+                        targetEntityId,
                         originalRiskLevel,
-                        newRiskLevel,
+                        targetRiskLevel,
                         draggedItem.getAttribute('data-item-id')
                     );
                 } else {
@@ -2803,8 +2818,8 @@
                     
                     // Broadcast position change within the same risk level
                     broadcastItemReorder(
-                        entityId,
-                        newRiskLevel,
+                        targetEntityId,
+                        targetRiskLevel,
                         draggedItem.getAttribute('data-item-id'),
                         newPosition
                     );
@@ -2822,13 +2837,21 @@
                     // Remove container drag-over class
                     container.classList.remove('container-drag-over');
                     
-                    // Get new risk level
+                    // Get new risk level and entity
                     const riskColumn = container.closest('.risk-column');
+                    const entityRow = riskColumn.closest('.entity-row');
+                    const newEntityId = entityRow.querySelector('.entity-title').textContent;
+                    
                     let newRiskLevel = originalRiskLevel;
                     if (riskColumn.classList.contains('no-risk')) newRiskLevel = 'No';
                     if (riskColumn.classList.contains('at-risk')) newRiskLevel = 'At';
                     if (riskColumn.classList.contains('high-risk')) newRiskLevel = 'High';
-                    console.log('New risk level:', newRiskLevel);
+                    
+                    console.log(`New risk level: ${newRiskLevel}, New entity: ${newEntityId}`);
+                    
+                    // Check if we're changing entity or risk level
+                    const riskLevelChanged = newRiskLevel !== originalRiskLevel;
+                    const entityChanged = newEntityId !== originalEntityId;
                     
                     // Store if we're in the same container (important for reordering logic)
                     const sameContainer = (container === originalContainer);
@@ -2855,14 +2878,22 @@
                     newPosition = Array.from(container.children).indexOf(draggedItem);
                     console.log(`New position: ${newPosition}`);
                     
-                    // Update the risk level attribute if it changed
-                    if (newRiskLevel !== originalRiskLevel) {
-                        console.log('Risk level changed, updating attribute and broadcasting');
-                        draggedItem.setAttribute('data-risk', newRiskLevel);
+                    // Update the risk level and entity attributes if changed
+                    if (riskLevelChanged || entityChanged) {
+                        if (riskLevelChanged) {
+                            console.log(`Risk level changed from ${originalRiskLevel} to ${newRiskLevel}`);
+                            draggedItem.setAttribute('data-risk', newRiskLevel);
+                        }
+                        
+                        if (entityChanged) {
+                            console.log(`Entity changed from ${originalEntityId} to ${newEntityId}`);
+                            draggedItem.setAttribute('data-entity', newEntityId);
+                        }
                         
                         // Broadcast the move to other users
                         broadcastItemMove(
-                            entityId,
+                            originalEntityId,
+                            newEntityId,
                             originalRiskLevel,
                             newRiskLevel,
                             draggedItem.getAttribute('data-item-id')
@@ -2873,7 +2904,7 @@
                         
                         // Broadcast position change
                         broadcastItemReorder(
-                            entityId,
+                            newEntityId,
                             newRiskLevel,
                             draggedItem.getAttribute('data-item-id'),
                             newPosition
@@ -2888,12 +2919,12 @@
             return false;
         }
 
-        // Broadcast item move between risk levels
-        function broadcastItemMove(entityId, originalRiskLevel, newRiskLevel, itemId) {
-            console.log('Broadcasting item move:', { entityId, originalRiskLevel, newRiskLevel, itemId });
+        // Broadcast item move between risk levels and/or entities
+        function broadcastItemMove(originalEntityId, newEntityId, originalRiskLevel, newRiskLevel, itemId) {
+            console.log('Broadcasting item move:', { originalEntityId, newEntityId, originalRiskLevel, newRiskLevel, itemId });
             
             // Get the position within the new container
-            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${newRiskLevel}"][data-item-id="${itemId}"]`);
+            const item = document.querySelector(`.item[data-entity="${newEntityId}"][data-risk="${newRiskLevel}"][data-item-id="${itemId}"]`);
             const container = item.parentNode;
             
             // Calculate exact position
@@ -2909,7 +2940,8 @@
                 event: 'item_move',
                 payload: {
                     userId: sessionUserId,
-                    entityId,
+                    originalEntityId,
+                    newEntityId,
                     originalRiskLevel,
                     newRiskLevel,
                     itemId,
@@ -2922,7 +2954,7 @@
             });
         }
 
-        // Handle item move between risk levels
+        // Handle item move between risk levels and/or entities
         function handleItemMove(payload) {
             console.log('Item move update:', payload);
             
@@ -2931,18 +2963,17 @@
                 return;
             }
             
-            const { entityId, originalRiskLevel, newRiskLevel, itemId, newPosition } = payload.payload;
-            console.log(`Moving item to position ${newPosition} in ${newRiskLevel} risk level`);
+            const { originalEntityId, newEntityId, originalRiskLevel, newRiskLevel, itemId, newPosition } = payload.payload;
+            console.log(`Moving item from ${originalEntityId}/${originalRiskLevel} to ${newEntityId}/${newRiskLevel} at position ${newPosition}`);
             
             // Find the item
-            const item = document.querySelector(`.item[data-entity="${entityId}"][data-risk="${originalRiskLevel}"][data-item-id="${itemId}"]`);
+            const item = document.querySelector(`.item[data-entity="${originalEntityId}"][data-risk="${originalRiskLevel}"][data-item-id="${itemId}"]`);
             if (item) {
-                // Find the entity row
+                // Find the target entity row
                 const entityRow = Array.from(document.querySelectorAll('.entity-row'))
-                    .find(row => row.querySelector('.entity-title').textContent === entityId);
+                    .find(row => row.querySelector('.entity-title').textContent === newEntityId);
                 
                 if (entityRow) {
-                    // Find the target risk column
                     const riskColumn = entityRow.querySelector(
                         newRiskLevel === 'No' ? '.no-risk' :
                         newRiskLevel === 'At' ? '.at-risk' :
@@ -2950,58 +2981,26 @@
                     );
                     
                     if (riskColumn) {
-                        // Find the target container
-                        const targetContainer = riskColumn.querySelector('.items-container');
+                        const container = riskColumn.querySelector('.items-container');
                         
-                        // Update the risk level attribute
-                        item.setAttribute('data-entity', entityId); // Ensure entity is correct
-                        item.setAttribute('data-risk', newRiskLevel); // Update risk level
-                        
-                        // Add a subtle animation effect
-                        item.style.transition = 'all 0.5s ease';
-                        item.style.backgroundColor = 'rgba(13, 110, 253, 0.1)';
-                        
-                        // Remove the item from its current container
+                        // Remove the item from its current location
                         item.remove();
                         
-                        // Get the existing items in the target container
-                        const targetItems = Array.from(targetContainer.children);
+                        // Update the risk level and entity attributes
+                        item.setAttribute('data-risk', newRiskLevel);
+                        item.setAttribute('data-entity', newEntityId);
                         
-                        // Insert the item at the specified position - handle edge cases carefully
-                        if (newPosition !== undefined) {
-                            if (newPosition === 0) {
-                                // Special case for position 0 (beginning of container)
-                                targetContainer.insertBefore(item, targetContainer.firstChild);
-                            } else if (newPosition < targetItems.length) {
-                                // Insert at the specified position
-                                targetContainer.insertBefore(item, targetItems[newPosition]);
-                            } else {
-                                // If position is at or beyond the end, append to the end
-                                targetContainer.appendChild(item);
-                            }
-                            
-                            // Store the position in a data attribute for verification
-                            item.setAttribute('data-position', newPosition.toString());
-                            
-                            console.log(`Item moved to position ${newPosition} in container`);
+                        // Insert at the correct position
+                        if (newPosition === 0) {
+                            container.insertBefore(item, container.firstChild);
+                        } else if (newPosition < container.children.length) {
+                            container.insertBefore(item, container.children[newPosition]);
                         } else {
-                            // Fallback: append to the end if no position specified
-                            targetContainer.appendChild(item);
-                            console.log('No position specified, appended to end');
+                            container.appendChild(item);
                         }
                         
-                        // Return to normal appearance after animation
-                        setTimeout(() => {
-                            item.style.backgroundColor = '';
-                            
-                            // Reset transition after animation completes
-                            setTimeout(() => {
-                                item.style.transition = '';
-                            }, 500);
-                        }, 500);
-                        
                         // Verify final position
-                        const finalPosition = Array.from(targetContainer.children).indexOf(item);
+                        const finalPosition = Array.from(container.children).indexOf(item);
                         console.log(`Final position verification: ${finalPosition} (expected ${newPosition})`);
                         
                         // Show a subtle notification that content was updated
@@ -3014,10 +3013,10 @@
                         console.error('Target risk column not found for level:', newRiskLevel);
                     }
                 } else {
-                    console.error('Entity row not found for entity:', entityId);
+                    console.error('Entity row not found for entity:', newEntityId);
                 }
             } else {
-                console.error('Item not found for move:', { entityId, originalRiskLevel, itemId });
+                console.error('Item not found for move:', { originalEntityId, originalRiskLevel, itemId });
             }
         }
 
@@ -3172,26 +3171,23 @@
             const riskColumns = document.querySelectorAll('.risk-column');
             riskColumns.forEach(column => {
                 column.addEventListener('dragover', function(e) {
+                    // Don't handle if we're already over an items-container
+                    if (e.target.closest('.items-container')) {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    
                     // Don't allow dragging if any cell is being edited
                     if (currentlyEditingCell) {
                         return;
                     }
                     
-                    // Only handle if we're not already over an items-container
-                    if (!e.target.closest('.items-container') && draggedItem) {
-                        e.preventDefault();
-                        
-                        // Find the items container within this risk column
-                        const container = this.querySelector('.items-container');
-                        if (container) {
-                            // Remove drag-over class from all containers
-                            const containers = document.querySelectorAll('.items-container');
-                            containers.forEach(c => c.classList.remove('container-drag-over'));
-                            
-                            // Add drag-over class to this container
-                            container.classList.add('container-drag-over');
-                        }
-                    }
+                    // Remove drag-over class from all columns
+                    riskColumns.forEach(col => col.classList.remove('drag-over'));
+                    
+                    // Add drag-over class to this column
+                    this.classList.add('drag-over');
                 });
                 
                 column.addEventListener('drop', function(e) {
@@ -3212,8 +3208,16 @@
                             // Remove container drag-over class
                             container.classList.remove('container-drag-over');
                             
-                            // Get original position and risk level before moving
+                            // Get original position, risk level, and entity before moving
                             const originalRiskLevel = draggedItem.getAttribute('data-risk');
+                            const originalEntityId = draggedItem.getAttribute('data-entity');
+                            
+                            // Get the entity row for this risk column to determine the new entity
+                            const entityRow = this.closest('.entity-row');
+                            const newEntityId = entityRow.querySelector('.entity-title').textContent;
+                            
+                            console.log('Original entity:', originalEntityId);
+                            console.log('New entity:', newEntityId);
                             console.log('Original risk level:', originalRiskLevel);
                             
                             // Append to the container
@@ -3226,14 +3230,28 @@
                             if (this.classList.contains('high-risk')) newRiskLevel = 'High';
                             console.log('New risk level:', newRiskLevel);
                             
+                            // Check for changes in entity and risk level
+                            const riskLevelChanged = newRiskLevel !== originalRiskLevel;
+                            const entityChanged = newEntityId !== originalEntityId;
+                            
                             // Update the risk level attribute if it changed
-                            if (newRiskLevel !== originalRiskLevel) {
-                                console.log('Risk level changed, updating attribute and broadcasting');
+                            if (riskLevelChanged) {
+                                console.log('Risk level changed, updating attribute');
                                 draggedItem.setAttribute('data-risk', newRiskLevel);
-                                
+                            }
+                            
+                            // Update the entity attribute if it changed
+                            if (entityChanged) {
+                                console.log('Entity changed, updating attribute');
+                                draggedItem.setAttribute('data-entity', newEntityId);
+                            }
+                            
+                            // Broadcast the changes if either entity or risk level changed
+                            if (riskLevelChanged || entityChanged) {
                                 // Broadcast the move to other users
                                 broadcastItemMove(
-                                    draggedItem.getAttribute('data-entity'),
+                                    originalEntityId,
+                                    newEntityId,
                                     originalRiskLevel,
                                     newRiskLevel,
                                     draggedItem.getAttribute('data-item-id')
@@ -3242,7 +3260,7 @@
                                 console.log('Risk level unchanged, broadcasting reorder');
                                 // Broadcast position change
                                 broadcastItemReorder(
-                                    draggedItem.getAttribute('data-entity'),
+                                    newEntityId,
                                     newRiskLevel,
                                     draggedItem.getAttribute('data-item-id'),
                                     Array.from(container.children).indexOf(draggedItem)
@@ -3273,13 +3291,27 @@
                 return a.position - b.position;
             });
             
+            // Count items by entity and risk level for debugging
+            const itemCounts = {};
             savedItems.forEach(item => {
                 if (item.category === currentCategory) {
-                    // Find the correct container
+                    const key = `${item.entity}-${item.risk_level}`;
+                    itemCounts[key] = (itemCounts[key] || 0) + 1;
+                }
+            });
+            console.log('Item counts by entity and risk level:', itemCounts);
+            
+            // Load each item
+            savedItems.forEach(item => {
+                if (item.category === currentCategory) {
+                    console.log(`Loading item: ${item.text.substring(0, 20)}... (Entity: ${item.entity}, Risk: ${item.risk_level}, Position: ${item.position})`);
+                    
+                    // Find the correct entity row by matching the entity title text
                     const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                         .find(row => row.querySelector('.entity-title').textContent === item.entity);
                     
                     if (entityRow) {
+                        // Find the correct risk column within the entity row
                         const riskColumn = entityRow.querySelector(
                             item.risk_level === 'No' ? '.no-risk' :
                             item.risk_level === 'At' ? '.at-risk' :
@@ -3333,7 +3365,11 @@
                             
                             // Initialize drag and drop for this item
                             initializeDragForItem(itemElement);
+                        } else {
+                            console.error(`Risk column not found for level: ${item.risk_level} in entity: ${item.entity}`);
                         }
+                    } else {
+                        console.error(`Entity row not found for entity: ${item.entity}`);
                     }
                 }
             });
@@ -3618,12 +3654,14 @@ const tips = [
             }
             
             const { entityId, riskLevel, itemId, position } = payload.payload;
+            console.log(`Handling new item: Entity=${entityId}, Risk=${riskLevel}, ID=${itemId}`);
             
-            // Find the correct container
+            // Find the correct entity row
             const entityRow = Array.from(document.querySelectorAll('.entity-row'))
                 .find(row => row.querySelector('.entity-title').textContent === entityId);
             
             if (entityRow) {
+                // Find the correct risk column within the entity row
                 const riskColumn = entityRow.querySelector(
                     riskLevel === 'No' ? '.no-risk' :
                     riskLevel === 'At' ? '.at-risk' :
@@ -3676,14 +3714,18 @@ const tips = [
                         // Initialize drag and drop for this item
                         initializeDragForItem(itemElement);
                         
-                        // Show a subtle notification that content was updated
+                        // Show a subtle notification that a new item was added
                         const autoSaveIndicator = document.getElementById('auto-save-indicator');
                         autoSaveIndicator.innerHTML = 'Nytt objekt tillagt';
                         setTimeout(() => {
                             autoSaveIndicator.innerHTML = '';
                         }, 2000);
                     }
+                } else {
+                    console.error(`Risk column not found for level ${riskLevel} in entity ${entityId}`);
                 }
+            } else {
+                console.error(`Entity row not found for entity: ${entityId}`);
             }
         }
 
