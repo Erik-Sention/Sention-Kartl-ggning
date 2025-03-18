@@ -1259,8 +1259,8 @@
         </div>
     </div>
 
-    <!-- HR Row -->
-    <div class="entity-row">
+    <!-- Main content rows -->
+    <div class="entity-row" data-category="{{ current_category }}">
         <div class="entity-title">HR</div>
         <div class="risk-columns">
             <div class="risk-column no-risk">
@@ -1287,7 +1287,7 @@
     </div>
 
     <!-- Company Health Row -->
-    <div class="entity-row">
+    <div class="entity-row" data-category="{{ current_category }}">
         <div class="entity-title">Företagshälsovård</div>
         <div class="risk-columns">
             <div class="risk-column no-risk">
@@ -1314,23 +1314,23 @@
     </div>
 
     <!-- Other Providers Row -->
-    <div class="entity-row">
-        <div class="entity-title">Specialistinterventioner</div>
+    <div class="entity-row" data-category="{{ current_category }}">
+        <div class="entity-title">Andra leverantörer</div>
         <div class="risk-columns">
             <div class="risk-column no-risk">
                 <h3>🟢 Ej risk</h3>
                 <div class="items-container"></div>
-                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'No')">+</button>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Andra leverantörer', 'No')">+</button>
             </div>
             <div class="risk-column at-risk">
                 <h3>🟡 Risk</h3>
                 <div class="items-container"></div>
-                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'At')">+</button>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Andra leverantörer', 'At')">+</button>
             </div>
             <div class="risk-column high-risk">
                 <h3>🔴 Hög risk</h3>
                 <div class="items-container"></div>
-                <button class="add-item-btn" onclick="addNewItem(this, 'Specialistinterventioner', 'High')">+</button>
+                <button class="add-item-btn" onclick="addNewItem(this, 'Andra leverantörer', 'High')">+</button>
             </div>
         </div>
         <div class="indicators">
@@ -1760,6 +1760,7 @@
                                 itemElement.setAttribute('data-risk', item.risk_level);
                                 itemElement.setAttribute('data-item-id', item.id || generateUUID());
                                 itemElement.setAttribute('data-position', item.position.toString());
+                                itemElement.setAttribute('data-category', item.category);
                                 
                                 // Use empty string if rating is null, undefined, or empty
                                 const ratingValue = item.rating || '';
@@ -2045,6 +2046,7 @@
             item.setAttribute('data-entity', entity);
             item.setAttribute('data-risk', riskLevel);
             item.setAttribute('data-item-id', itemId);
+            item.setAttribute('data-category', currentCategory); // Set the current category
             item.innerHTML = `
                 <i class="bi bi-grip-vertical drag-handle" title="Dra för att ändra ordning"></i>
                 <div class="item-text" contenteditable="true" data-placeholder="Skriv text här" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></div>
@@ -2127,7 +2129,8 @@
                     entityId: entity,
                     riskLevel: riskLevel,
                     itemId: itemId,
-                    position: position
+                    position: position,
+                    category: currentCategory // Add category to payload
                 }
             });
         }
@@ -3295,6 +3298,7 @@
                             itemElement.setAttribute('data-risk', item.risk_level);
                             itemElement.setAttribute('data-item-id', item.id || generateUUID());
                             itemElement.setAttribute('data-position', item.position.toString());
+                            itemElement.setAttribute('data-category', item.category);
                             
                             // Use empty string if rating is null, undefined, or empty
                             const ratingValue = item.rating || '';
@@ -3617,7 +3621,13 @@ const tips = [
                 return;
             }
             
-            const { entityId, riskLevel, itemId, position } = payload.payload;
+            const { entityId, riskLevel, itemId, position, category } = payload.payload;
+            
+            // Skip if category doesn't match current category
+            if (category !== currentCategory) {
+                console.log('Ignoring new item from different category:', category);
+                return;
+            }
             
             // Find the correct container
             const entityRow = Array.from(document.querySelectorAll('.entity-row'))
@@ -3643,6 +3653,7 @@ const tips = [
                         itemElement.setAttribute('data-entity', entityId);
                         itemElement.setAttribute('data-risk', riskLevel);
                         itemElement.setAttribute('data-item-id', itemId);
+                        itemElement.setAttribute('data-category', category || currentCategory); // Set category
                         
                         itemElement.innerHTML = `
                             <i class="bi bi-grip-vertical drag-handle" title="Dra för att ändra ordning"></i>
@@ -4146,6 +4157,13 @@ const tips = [
             // Clean the text (remove icon text and copy button text)
             const cleanText = interventionText.replace(/^[\u2713\u2714\✓\✔\u2705\u25A0\•\◦\-\+\*]+\s*/, '').replace('Kopiera', '').trim();
             
+            // Check if cell is part of the current visible category/tab
+            const row = cell.closest('.entity-row');
+            if (!row || row.getAttribute('data-category') !== currentCategory) {
+                console.log('Not adding intervention to cell of different category');
+                return;
+            }
+            
             // Create an input element to simulate user input
             const fakeInput = document.createElement('input');
             fakeInput.value = cleanText;
@@ -4176,6 +4194,7 @@ const tips = [
                     const newItem = document.createElement('div');
                     newItem.className = 'item';
                     newItem.setAttribute('draggable', 'true');
+                    newItem.setAttribute('data-category', currentCategory);
                     
                     // Create content element
                     const content = document.createElement('div');
