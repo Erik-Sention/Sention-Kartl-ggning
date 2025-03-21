@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
     role TEXT DEFAULT 'user',
+    "Organization" TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -54,8 +55,23 @@ CREATE POLICY "Users can delete their own items" ON public.items
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Create policies for resources
-CREATE POLICY "Users can view all resources" ON public.resources
-    FOR SELECT USING (true);
+CREATE POLICY "Users can view resources in same organization" ON public.resources
+    FOR SELECT USING (
+        -- Allow if user_id is null (anonymous resource)
+        user_id IS NULL 
+        OR 
+        -- Or if user_id matches the authenticated user
+        auth.uid() = user_id
+        OR
+        -- Or if the user is in the same organization as the resource creator
+        EXISTS (
+            SELECT 1 FROM public.users u1, public.users u2
+            WHERE u1.id = auth.uid() 
+            AND u2.id = user_id
+            AND u1."Organization" = u2."Organization"
+            AND u1."Organization" IS NOT NULL
+        )
+    );
 
 CREATE POLICY "Users can insert resources" ON public.resources
     FOR INSERT WITH CHECK (

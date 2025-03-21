@@ -1053,7 +1053,6 @@
         /* Search container styles */
         .search-container {
             margin-bottom: 15px;
-            display: flex;
         }
         
         .intervention-search {
@@ -1063,9 +1062,6 @@
             border-radius: 6px;
             font-size: 14px;
             transition: all 0.2s ease;
-            flex: 1;
-            padding: 8px 10px;
-            border-radius: 6px;
         }
         
         .intervention-search:focus {
@@ -3929,6 +3925,234 @@ const tips = [
                 }
             }
         }
+
+        // Search functionality
+        document.getElementById('interventionSearch').addEventListener('input', function() {
+            console.log('Search input triggered with value:', this.value); // Debug logging
+            const searchTerm = this.value.toLowerCase().trim();
+            const allItems = document.querySelectorAll('.intervention-item');
+            const categories = document.querySelectorAll('.intervention-category');
+            let foundAny = false;
+            
+            console.log('Total items to search through:', allItems.length); // Debug logging
+            
+            // Reset display before searching
+            allItems.forEach(item => {
+                // If empty search term, show all items
+                if (searchTerm === '') {
+                    item.style.display = 'flex';
+                    foundAny = true;
+                    return;
+                }
+                
+                // Get the text content of the entire item to include all child nodes
+                const itemText = item.textContent.toLowerCase().trim();
+                
+                // Also specifically check the intervention-text span if it exists
+                const textElement = item.querySelector('.intervention-text');
+                const spanText = textElement ? textElement.textContent.toLowerCase().trim() : '';
+                
+                // Show item if either the full text or the span text includes the search term
+                if (itemText.includes(searchTerm) || spanText.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                    foundAny = true;
+                    console.log('Match found in item:', itemText); // Debug logging
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Show/hide categories based on if they have visible items
+            categories.forEach(category => {
+                // Count items that are not hidden by the search
+                const visibleItemCount = Array.from(category.querySelectorAll('.intervention-item'))
+                    .filter(item => item.style.display !== 'none').length;
+                
+                console.log('Category:', category.querySelector('h4')?.textContent, 'visible items:', visibleItemCount);
+                
+                // Always show "Mina interventionsförslag" category, hide others if empty
+                const categoryTitle = category.querySelector('h4')?.textContent || '';
+                if (visibleItemCount === 0 && categoryTitle !== 'Mina interventionsförslag') {
+                    category.style.display = 'none';
+                } else {
+                    category.style.display = 'block';
+                }
+            });
+            
+            // Show no results message if needed
+            let noResultsMsg = document.getElementById('noResultsMsg');
+            if (!noResultsMsg) {
+                noResultsMsg = document.createElement('div');
+                noResultsMsg.id = 'noResultsMsg';
+                noResultsMsg.className = 'no-results';
+                noResultsMsg.textContent = 'Inga resultat hittades';
+                document.getElementById('interventionPanel').appendChild(noResultsMsg);
+            }
+            
+            noResultsMsg.style.display = foundAny ? 'none' : 'block';
+            
+            // Debug info
+            console.log('Search results - Found any matches:', foundAny);
+        });
+        
+        // Add custom intervention
+        document.getElementById('addInterventionBtn').addEventListener('click', function() {
+            addCustomIntervention();
+        });
+        
+        // Add intervention on Enter key
+        document.getElementById('newIntervention').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addCustomIntervention();
+            }
+        });
+        
+        // Save custom intervention to the database
+        function saveCustomIntervention(text) {
+            // Call API to save the intervention as a resource
+            fetch('/add_resource', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    console.log('Intervention saved to database:', data.resource);
+                } else {
+                    console.error('Error saving intervention:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving intervention:', error);
+            });
+        }
+        
+        // Load custom interventions from API
+        function loadCustomInterventions() {
+            // Clear existing interventions to prevent duplicates on reload
+            const customInterventionsList = document.getElementById('customInterventions');
+            customInterventionsList.innerHTML = '';
+            
+            // Fetch interventions from API
+            fetch('/api/interventions')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.interventions && data.interventions.length > 0) {
+                        data.interventions.forEach(resource => {
+                            // Create new intervention item
+                            const li = document.createElement('li');
+                            li.className = 'intervention-item';
+                            
+                            // Add icon
+                            const icon = document.createElement('i');
+                            icon.className = 'bi bi-check-circle';
+                            icon.style.marginRight = '8px'; // Add spacing between icon and text
+                            li.appendChild(icon);
+                            
+                            // Add text as a separate element for better control
+                            const textSpan = document.createElement('span');
+                            textSpan.textContent = resource.text;
+                            textSpan.className = 'intervention-text';
+                            textSpan.style.flex = '1'; // Take up available space
+                            
+                            // Store resource ID for later deletion
+                            textSpan.dataset.resourceId = resource.id;
+                            
+                            li.appendChild(textSpan);
+                            
+                            // Add click event for copying on item click
+                            li.addEventListener('click', function(e) {
+                                // Ignore clicks on delete button
+                                if (e.target.closest('.delete-intervention')) {
+                                    return;
+                                }
+                                
+                                // Get text from the span
+                                const textToCopy = textSpan.textContent.trim();
+                                
+                                // Store this as the last copied text for auto-filling
+                                window.lastCopiedText = textToCopy;
+                                
+                                // Copy to clipboard
+                                navigator.clipboard.writeText(textToCopy).then(() => {
+                                    // Add copied class
+                                    li.classList.add('copied');
+                                    
+                                    // Remove copied class after a delay
+                                    setTimeout(() => {
+                                        li.classList.remove('copied');
+                                    }, 2000);
+                                    
+                                    // Show tooltip
+                                    const tooltip = document.createElement('div');
+                                    tooltip.className = 'copy-tooltip';
+                                    tooltip.textContent = 'Kopierad!';
+                                    li.appendChild(tooltip);
+                                    
+                                    // Remove tooltip after animation
+                                    setTimeout(() => {
+                                        tooltip.remove();
+                                    }, 2000);
+                                    
+                                    // Show auto-save indicator if it exists
+                                    const autoSaveIndicator = document.getElementById('autoSaveIndicator');
+                                    if (autoSaveIndicator) {
+                                        autoSaveIndicator.innerHTML = 'Text kopierad till urklipp';
+                                        setTimeout(() => {
+                                            autoSaveIndicator.innerHTML = '';
+                                        }, 3000);
+                                    }
+                                }).catch(err => {
+                                    console.error('Kunde inte kopiera text: ', err);
+                                });
+                            });
+                            
+                            // Add delete button
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'delete-intervention';
+                            deleteBtn.title = 'Ta bort';
+                            deleteBtn.innerHTML = '<i class="bi bi-x-circle"></i>';
+                            deleteBtn.style.marginLeft = 'auto';
+                            deleteBtn.style.background = 'transparent';
+                            deleteBtn.style.border = 'none';
+                            deleteBtn.style.color = '#dc3545';
+                            deleteBtn.style.padding = '5px 8px';
+                            deleteBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                li.remove();
+                                
+                                // Delete from database
+                                fetch(`/delete_resource/${resource.id}`, {
+                                    method: 'DELETE'
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.status === 'success') {
+                                        console.log('Intervention deleted from database');
+                                    } else {
+                                        console.error('Error deleting intervention:', data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error deleting intervention:', error);
+                                });
+                            });
+                            li.appendChild(deleteBtn);
+                            
+                            // Add to list
+                            customInterventionsList.appendChild(li);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading interventions:', error);
+                });
+        }
     </script>
 
     <!-- Intervention Button and Panel -->
@@ -3960,31 +4184,17 @@ const tips = [
             <ul class="intervention-list">
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Arbetsmiljögenomgång<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Introduktion till arbetsmiljö för nyanställda<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
+                <li class="intervention-item"><i class="bi bi-check-circle"></i>Arbetsmiljöpolicy<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Arbetsmiljöutbildning<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Årlig uppföljning av systematiskt arbetsmiljöarbete (SAM)<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Avvikelserapporteringssystem för arbetsmiljö<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Egeninspektion av arbetsmiljö<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
+                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för alkohol och droger<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Systematiskt arbetsmiljöarbete och anpassningsprocesser<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Riskbedömningar på arbetsplatsen<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Samverkan med skyddsombud<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Visselblåsarsystem<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
                 <li class="intervention-item"><i class="bi bi-check-circle"></i>Ergonomisk arbetsplatsanalys<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-            </ul>
-        </div>
-
-        <div class="intervention-category">
-            <h4>Policys</h4>
-            <ul class="intervention-list">
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Arbetsmiljöpolicy<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för alkohol och droger<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för psykisk hälsa och välmående<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy mot kränkande särbehandling och trakasserier<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Sjukfrånvaro- och rehabiliteringspolicy<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för flexibelt arbete och ergonomi<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Hälsa- och friskvårdspolicy<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Tobaksfri arbetsplats-policy<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för balans mellan arbete och privatliv<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
-                <li class="intervention-item"><i class="bi bi-check-circle"></i>Policy för kris- och stresshantering<button class="copy-btn" title="Kopiera"><i class="bi bi-clipboard"></i></button></li>
             </ul>
         </div>
 
@@ -4468,43 +4678,35 @@ const tips = [
         
         // Search functionality
         document.getElementById('interventionSearch').addEventListener('input', function() {
+            console.log('Search input triggered with value:', this.value); // Debug logging
             const searchTerm = this.value.toLowerCase().trim();
             const allItems = document.querySelectorAll('.intervention-item');
             const categories = document.querySelectorAll('.intervention-category');
             let foundAny = false;
             
-            // If search is empty, show all items and categories
-            if (searchTerm === '') {
-                allItems.forEach(item => {
-                    item.style.display = 'flex';
-                });
-                categories.forEach(category => {
-                    category.style.display = 'block';
-                });
-                // Hide no results message
-                const noResultsMsg = document.getElementById('noResultsMsg');
-                if (noResultsMsg) {
-                    noResultsMsg.style.display = 'none';
-                }
-                return;
-            }
+            console.log('Total items to search through:', allItems.length); // Debug logging
             
+            // Reset display before searching
             allItems.forEach(item => {
-                // Get the text from the intervention-text span or directly from the item
-                const textElement = item.querySelector('.intervention-text');
-                let text;
-                
-                if (textElement) {
-                    // For dynamically loaded interventions (with .intervention-text span)
-                    text = textElement.textContent.toLowerCase();
-                } else {
-                    // For hardcoded interventions (text directly in the li)
-                    text = item.textContent.toLowerCase();
-                }
-                
-                if (text.includes(searchTerm)) {
+                // If empty search term, show all items
+                if (searchTerm === '') {
                     item.style.display = 'flex';
                     foundAny = true;
+                    return;
+                }
+                
+                // Get the text content of the entire item to include all child nodes
+                const itemText = item.textContent.toLowerCase().trim();
+                
+                // Also specifically check the intervention-text span if it exists
+                const textElement = item.querySelector('.intervention-text');
+                const spanText = textElement ? textElement.textContent.toLowerCase().trim() : '';
+                
+                // Show item if either the full text or the span text includes the search term
+                if (itemText.includes(searchTerm) || spanText.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                    foundAny = true;
+                    console.log('Match found in item:', itemText); // Debug logging
                 } else {
                     item.style.display = 'none';
                 }
@@ -4512,8 +4714,15 @@ const tips = [
             
             // Show/hide categories based on if they have visible items
             categories.forEach(category => {
-                const visibleItems = category.querySelectorAll('.intervention-item[style="display: flex;"]');
-                if (visibleItems.length === 0 && category.querySelector('h4').textContent !== 'Mina interventionsförslag') {
+                // Count items that are not hidden by the search
+                const visibleItemCount = Array.from(category.querySelectorAll('.intervention-item'))
+                    .filter(item => item.style.display !== 'none').length;
+                
+                console.log('Category:', category.querySelector('h4')?.textContent, 'visible items:', visibleItemCount);
+                
+                // Always show "Mina interventionsförslag" category, hide others if empty
+                const categoryTitle = category.querySelector('h4')?.textContent || '';
+                if (visibleItemCount === 0 && categoryTitle !== 'Mina interventionsförslag') {
                     category.style.display = 'none';
                 } else {
                     category.style.display = 'block';
@@ -4531,6 +4740,9 @@ const tips = [
             }
             
             noResultsMsg.style.display = foundAny ? 'none' : 'block';
+            
+            // Debug info
+            console.log('Search results - Found any matches:', foundAny);
         });
         
         // Add custom intervention

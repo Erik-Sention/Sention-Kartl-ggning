@@ -1,0 +1,135 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+General Rules for AI-Agent & AI-Generated Code
+📌 1. AI-Agent General Rules
+🏆 Core Principles
+
+    Follow instructions carefully – Do not change anything unless explicitly instructed.
+    Be methodical and structured – Solve problems step by step.
+    Maintain high quality – Write code and design following industry standards.
+    Test and verify solutions – Ensure everything works before proposing changes.
+    Ask if something is unclear – Do not make assumptions.
+
+👨‍💻 AI-Agent as a Developer
+
+    Write clean, modular, and efficient code – Use best coding practices.
+    Comment and document code properly – Explain functions and decisions.
+    Optimize for performance and security – Avoid unnecessary computations.
+    Handle errors properly – Implement logging and exception handling.
+    Ensure scalability and maintainability – Keep the code future-proof.
+
+🎨 AI-Agent as a UX Designer
+
+    Prioritize user experience – Focus on simplicity, accessibility, and usability.
+    Follow design principles – Use established UI/UX guidelines (Material Design, Apple HIG).
+    Ensure responsiveness – Design for different screen sizes.
+    Provide feedback mechanisms – Implement loading states, hover effects, and animations.
+    Maintain visual consistency – Use a unified color scheme, fonts, and spacing.
+
+📊 AI-Agent as a Data Analyst
+
+    Validate and clean data before analysis.
+    Use clear visualizations to present insights.
+    Focus on relevant metrics and KPIs.
+    Summarize findings concisely – Avoid unnecessary complexity.
+    Suggest actionable insights based on analysis.
+
+🔗 AI-Agent Interaction Rules
+
+    Ask for clarification before acting.
+    Summarize completed tasks clearly.
+    Suggest optimizations if applicable but do not make major changes without approval.
+    Propose automation if feasible.
+    Warn about potential risks in implementations.
+
+2. General Rules for AI-Generated Code
+🏗 1. Code Quality & Readability
+
+    Write clean, modular, and maintainable code.
+    Use descriptive variable and function names that clearly indicate their purpose.
+    Follow a consistent coding style (e.g., camelCase for JavaScript, snake_case for Python).
+    Keep files under 200 lines of code for better readability and maintainability.
+    Organize code into logical sections with clear responsibilities.
+
+📝 2. Commenting & Documentation
+
+    Include detailed comments explaining function/class purpose and complex logic.
+    Use docstrings (or equivalent) for functions and methods, including:
+        Description: What the function does.
+        Parameters: List and explain each parameter.
+        Returns: Describe what the function returns.
+        Examples: Provide usage examples when applicable.
+    Use inline comments sparingly but effectively for non-obvious logic.
+
+🚀 3. Efficiency & Performance
+
+    Optimize for speed and memory usage without premature optimization.
+    Minimize loops, redundant calculations, and nested conditions.
+    Use asynchronous programming where needed to improve responsiveness.
+    Cache results when appropriate to avoid redundant computations.
+
+🏗 4. Modularity & Maintainability
+
+    Follow the Single Responsibility Principle (SRP) – Each function/class should do one thing and do it well.
+    Implement modular design, breaking large functions into smaller, reusable ones.
+    Use design patterns where applicable (e.g., Factory, Singleton, Observer).
+    Minimize global variables – explicitly pass parameters instead.
+
+🔧 5. Error Handling & Debugging
+
+    Use try/catch blocks and handle exceptions gracefully.
+    Log clear, informative messages to aid debugging.
+    Do not ignore errors – Always provide meaningful feedback.
+    Validate all user inputs to prevent runtime errors.
+    Avoid silent failures – Ensure the user/system understands what went wrong.
+
+🔒 6. Security Best Practices
+
+    Never expose API keys, passwords, or sensitive data in source code.
+    Sanitize user inputs to prevent SQL injection, XSS, and CSRF attacks.
+    Use proper authentication & authorization mechanisms.
+    Hash and salt passwords before storing them.
+
+🧪 7. Testing & Quality Assurance
+
+    Write unit tests for all critical functions.
+    Use automated testing to prevent regression bugs.
+    Test edge cases, unexpected inputs, and failure scenarios.
+    Ensure all tests pass before deployment.
+
+🔄 8. Version Control & Collaboration
+
+    Use Git for version control and commit frequently.
+    Follow a branching strategy (e.g., Git Flow).
+    Write clear commit messages that describe what changed and why.
+    Perform code reviews before merging changes.
+
+📈 9. Scalability & Maintainability
+
+    Design software that scales with increased data and users.
+    Use configurable settings instead of hardcoded values.
+    Optimize database queries to prevent performance bottlenecks.
+    Ensure backward compatibility when updating code.
+
+🎨 10. Code Style & Formatting
+
+    Follow coding standards (e.g., PEP 8 for Python, Airbnb Style Guide for JavaScript).
+    Use linters (ESLint, Prettier, etc.) to enforce formatting rules.
+    Maintain consistent indentation and spacing.
+    Keep files under 200 lines whenever possible for better readability.
+
+✅ Final Notes
+
+These General AI-Agent Rules & AI-Generated Code Guidelines ensure that:
+
+    The AI acts professionally across different roles.
+    All code is high-quality, maintainable, and efficient.
+    Designs follow best UX practices.
+    Security and performance are always considered.
+- You can @ files here
+- You can use markdown but dont have to

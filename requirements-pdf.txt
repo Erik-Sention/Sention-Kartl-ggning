@@ -1,0 +1,3 @@
+# PDF Generator requirements
+playwright==1.42.0
+asyncio>=3.4.3 

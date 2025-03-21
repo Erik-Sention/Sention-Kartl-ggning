@@ -12,6 +12,8 @@ import supabase_client as sb
 from supabase_client import get_supabase_client
 import uuid
 import datetime
+import subprocess
+import shutil
 
 # Load environment variables
 load_dotenv()
@@ -199,6 +201,7 @@ def signup():
     email = request.form.get('email')
     password = request.form.get('password')
     full_name = request.form.get('full_name', '')
+    organization = request.form.get('organization', '')
     
     print(f"Signup attempt: {username}, {email}")
     
@@ -245,7 +248,8 @@ def signup():
             "user_metadata": {
                 "username": username,
                 "full_name": full_name,
-                "role": role
+                "role": role,
+                "Organization": organization
             }
         })
         
@@ -259,6 +263,7 @@ def signup():
                 "email": email,
                 "full_name": full_name,
                 "role": role,
+                "Organization": organization,
                 "created_at": datetime.datetime.now().isoformat()
             }
             
@@ -326,11 +331,13 @@ def login():
         user = user_check.data[0]
         user_id = user['id']
         user_role = user.get('role', 'user')
+        user_organization = user.get('Organization', '')
         
         # Set session data
         session['user_id'] = user_id
         session['username'] = user.get('username')
         session['role'] = user_role
+        session['organization'] = user_organization
         session['logged_in'] = True
         
         # Store auth tokens in session
@@ -338,7 +345,7 @@ def login():
             session['access_token'] = auth_response.session.access_token
             session['refresh_token'] = auth_response.session.refresh_token
         
-        print(f"Session data set: user_id={user_id}, username={user.get('username')}, role={user_role}")
+        print(f"Session data set: user_id={user_id}, username={user.get('username')}, role={user_role}, organization={user_organization}")
         
         flash('Logged in successfully!')
         return redirect(url_for('home', category='anstalld'))
@@ -352,7 +359,7 @@ def login():
         if "Invalid login credentials" in str(e):
             flash('Invalid email or password')
         else:
-            flash(f'Login failed: {str(e)}')
+            flash('An error occurred while logging in')
             
         return redirect(url_for('index'))
 
@@ -384,12 +391,12 @@ def organisation_redirect():
 def foretagsledning_redirect():
     return redirect(url_for('home', category='foretagsledning'))
 
-@app.route('/managers-l6')
+@app.route('/managers')
 @login_required
 def managers_redirect():
     return redirect(url_for('home', category='managers'))
 
-@app.route('/supervisors-ac')
+@app.route('/supervisors')
 @login_required
 def supervisors_redirect():
     return redirect(url_for('home', category='supervisors'))
@@ -501,10 +508,10 @@ def home(category):
     
     try:
         # Get items from Supabase
-        items = sb.get_items(category)
+        user_id = session.get('user_id')
+        items = sb.get_items(category, user_id)
         
         # Convert items to JSON for the template
-        import json
         saved_items_json = json.dumps(items)
         
         # Get Supabase URL and key for client-side initialization
@@ -552,21 +559,32 @@ def save_item():
 @app.route('/delete_item', methods=['POST'])
 @login_required
 def delete_item():
-    try:
-        data = request.json
+    # Extract data from request
+    data = request.json
+    text = data.get('text')
+    entity = data.get('entity')
+    risk_level = data.get('risk_level')
+    category = data.get('category')
+    
+    # Call Supabase delete function
+    result = sb.delete_item(text, entity, risk_level, category)
+    
+    if result:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Failed to delete item'}), 500
+
+@app.route('/get_items', methods=['GET'])
+@login_required
+def get_items():
+    category = request.args.get('category')
+    user_id = session.get('user_id')
+    
+    if not category:
+        return jsonify({'error': 'Category parameter is required'}), 400
         
-        # Delete item from Supabase
-        sb.delete_item(
-            data['text'],
-            data['entity'],
-            data['risk_level'],
-            data['category']
-        )
-        
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print(f"Error deleting item: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    items = sb.get_items(category, user_id)
+    return jsonify(items)
 
 @app.route('/save_items', methods=['POST'])
 @login_required
@@ -689,6 +707,72 @@ def get_resources():
             'message': str(e)
         }), 500
 
+@app.route('/api/interventions', methods=['GET'])
+@login_required
+def get_interventions():
+    """
+    Get custom interventions for the current user's organization
+    """
+    try:
+        # Get current user details to ensure we have the latest organization value
+        user_id = session.get('user_id')
+        role = session.get('role')
+        
+        # Fetch the current user to get the most up-to-date organization
+        user_response = sb.supabase.table('users').select('*').eq('id', user_id).execute()
+        if user_response.data:
+            current_user = user_response.data[0]
+            organization = current_user.get('Organization', '')
+            
+            # Update session with fresh organization value
+            session['organization'] = organization
+            
+            print(f"User ID: {user_id}, Role: {role}, Organization: {organization}")
+        else:
+            organization = session.get('organization', '')
+            print(f"Using session organization: {organization}")
+        
+        # If admin user, show all interventions
+        if role == 'admin':
+            if organization:
+                # Get resources for the admin's organization
+                print(f"Admin user getting resources for organization: {organization}")
+                resources = sb.get_organization_resources(organization)
+                print(f"Found {len(resources)} resources for organization")
+            else:
+                # If admin has no organization, show all resources
+                print("Admin user with no organization getting all resources")
+                resources = sb.get_resources()
+                print(f"Found {len(resources)} total resources")
+        else:
+            # Non-admin users
+            if not organization:
+                # If user has no organization, only return their personal interventions
+                print(f"Regular user with no organization getting personal resources")
+                resources = sb.get_resources()
+                personal_resources = [r for r in resources if r.get('user_id') == user_id]
+                print(f"Found {len(personal_resources)} personal resources")
+                return jsonify({
+                    'status': 'success',
+                    'interventions': personal_resources
+                })
+            else:
+                # Get all resources from users in the same organization
+                print(f"Regular user getting resources for organization: {organization}")
+                resources = sb.get_organization_resources(organization)
+                print(f"Found {len(resources)} resources for organization")
+        
+        return jsonify({
+            'status': 'success',
+            'interventions': resources
+        })
+    except Exception as e:
+        print(f"Error getting interventions: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/add_resource', methods=['POST'])
 @login_required
 def add_resource():
@@ -698,7 +782,11 @@ def add_resource():
     try:
         data = request.get_json()
         text = data.get('text')
-        user_id = session.get('user_id')  # This might be None if user is not logged in
+        user_id = session.get('user_id')
+        role = session.get('role')
+        organization = session.get('organization')
+        
+        print(f"Adding resource: '{text}' for user_id: {user_id}, role: {role}, organization: {organization}")
         
         if not text:
             return jsonify({
@@ -710,11 +798,13 @@ def add_resource():
         resource = sb.add_resource(text, user_id)
         
         if resource:
+            print(f"Resource added successfully: {resource}")
             return jsonify({
                 'status': 'success',
                 'resource': resource
             })
         else:
+            print("Failed to add resource")
             return jsonify({
                 'status': 'error',
                 'message': 'Failed to add resource'
@@ -726,27 +816,52 @@ def add_resource():
             'message': str(e)
         }), 500
 
-@app.route('/delete_resource', methods=['POST'])
+@app.route('/delete_resource/<resource_id>', methods=['DELETE'])
 @login_required
-def delete_resource():
+def delete_resource_route(resource_id):
     """
     Delete a resource
     """
     try:
-        data = request.get_json()
-        resource_id = data.get('id')
+        # First check if the resource exists and belongs to the user or their organization
+        supabase = get_supabase_client()
+        resource_response = supabase.table("resources").select("*").eq("id", resource_id).execute()
         
-        if not resource_id:
+        if not resource_response.data:
             return jsonify({
                 'status': 'error',
-                'message': 'Resource ID is required'
-            }), 400
+                'message': 'Resource not found'
+            }), 404
             
+        resource = resource_response.data[0]
+        user_id = session.get('user_id')
+        organization = session.get('organization')
+        
+        # Check if user is the owner of the resource
+        if resource.get('user_id') != user_id:
+            # If not owner, check if admin
+            if session.get('role') != 'admin':
+                # If not admin, check if same organization
+                if organization:
+                    creator_response = supabase.table("users").select("Organization").eq("id", resource.get('user_id')).execute()
+                    if not creator_response.data or creator_response.data[0].get('Organization') != organization:
+                        return jsonify({
+                            'status': 'error',
+                            'message': 'Not authorized to delete this resource'
+                        }), 403
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Not authorized to delete this resource'
+                    }), 403
+        
+        # Delete the resource
         success = sb.delete_resource(resource_id)
         
         if success:
             return jsonify({
-                'status': 'success'
+                'status': 'success',
+                'message': 'Resource deleted successfully'
             })
         else:
             return jsonify({
@@ -802,6 +917,200 @@ def update_resource():
             'message': str(e)
         }), 500
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """
+    Dashboard route that displays a summary of data from different categories.
+    """
+    # Get Supabase URL and key for client-side initialization
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    
+    return render_template('dashboard.html', 
+                          current_category='dashboard',
+                          supabase_url=supabase_url,
+                          supabase_key=supabase_key)
+
+@app.route('/generate_pdf', methods=['POST'])
+@login_required
+def generate_pdf():
+    """
+    Route to handle PDF generation using the Playwright PDF generator
+    """
+    try:
+        data = request.get_json()
+        url = data.get('url', request.url_root + 'dashboard')
+        
+        # Create a directory for debug files if it doesn't exist
+        debug_dir = os.path.join(app.static_folder, 'debug')
+        os.makedirs(debug_dir, exist_ok=True)
+        
+        # Create a timestamped directory for this run
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        run_debug_dir = os.path.join(debug_dir, f'pdf_debug_{timestamp}')
+        os.makedirs(run_debug_dir, exist_ok=True)
+        
+        # Run the PDF generator script
+        output_path = os.path.join(app.static_folder, 'generated', 'output.pdf')
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Get the session cookie to pass to the PDF generator
+        session_cookie = request.cookies.get('session')
+        print(f"Session cookie available: {bool(session_cookie)}")
+        
+        # Get credentials provided in the request or from the current session
+        username = data.get('username') or session.get('username')
+        password = data.get('password')  # Only use password if explicitly provided in request
+        
+        # Check if credentials are stored in session
+        email = session.get('email')
+        if email and not username:
+            username = email
+        
+        print(f"Username available: {bool(username)}")
+        print(f"Password provided: {bool(password)}")
+        
+        # Build a complete URL if the one provided is relative
+        if not url.startswith('http'):
+            if url.startswith('/'):
+                url = request.url_root.rstrip('/') + url
+            else:
+                url = request.url_root.rstrip('/') + '/' + url
+        
+        print(f"PDF generation request for URL: {url}")
+        
+        # Options to pass to the PDF generator
+        pdf_generator_args = ['python', 'pdf_generator.py', url]
+        
+        # Prepare session data for authentication
+        if session_cookie:
+            # Create a cookie object for Playwright
+            cookie_data = [{
+                'name': 'session',
+                'value': session_cookie,
+                'path': '/',
+                'httpOnly': True,
+                'secure': url.startswith('https')
+            }]
+            cookie_json = json.dumps(cookie_data)
+            pdf_generator_args.append(cookie_json)
+        else:
+            # No session cookie, add empty string as placeholder
+            pdf_generator_args.append('')
+        
+        # Add credentials if available
+        if username:
+            pdf_generator_args.append(username)
+            if password:
+                pdf_generator_args.append(password)
+        
+        # Call the pdf_generator script with arguments
+        print(f"Calling PDF generator with args: {pdf_generator_args[:3]} [credentials hidden if present]")
+        result = subprocess.run(pdf_generator_args, capture_output=True, text=True)
+        
+        # Copy debug screenshots to static directory
+        if os.path.exists('debug'):
+            # Copy all files from the debug directory to the run debug directory
+            for file in os.listdir('debug'):
+                if file.endswith('.png'):
+                    src_path = os.path.join('debug', file)
+                    dst_path = os.path.join(run_debug_dir, file)
+                    shutil.copy2(src_path, dst_path)
+                    print(f"Copied debug file: {file} to {run_debug_dir}")
+        
+        debug_details = {
+            'stdout': result.stdout,
+            'stderr': result.stderr,
+            'debug_url': url_for('static', filename=f'debug/pdf_debug_{timestamp}') if os.listdir(run_debug_dir) else None
+        }
+        
+        print(f"PDF generator stdout: {result.stdout}")
+        print(f"PDF generator stderr: {result.stderr}")
+        
+        if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            # Success - return the PDF file URL
+            file_url = url_for('static', filename='generated/output.pdf')
+            return jsonify({
+                'status': 'success',
+                'message': 'PDF generated successfully',
+                'file_url': file_url,
+                'debug': debug_details
+            })
+        else:
+            # Error - check if the PDF was generated but the script returned error code
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                file_url = url_for('static', filename='generated/output.pdf')
+                return jsonify({
+                    'status': 'success',
+                    'message': 'PDF generated but with warnings',
+                    'file_url': file_url,
+                    'debug': debug_details
+                })
+            else:
+                # Real error - no PDF was generated
+                error_message = result.stderr.strip() if result.stderr else "Unknown error during PDF generation"
+                if "Login failed" in result.stdout or "redirected to login page" in result.stdout:
+                    # Credentials needed or invalid
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Inloggning krävs för att generera PDF. Logga in igen.',
+                        'needsCredentials': True,
+                        'debug': debug_details
+                    }), 401
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Error generating PDF: {error_message}',
+                        'debug': debug_details
+                    }), 500
+    except Exception as e:
+        print(f"PDF generation exception: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': f'Exception during PDF generation: {str(e)}'
+        }), 500
+
+@app.route('/admin/users/update/<user_id>', methods=['POST'])
+@login_required
+@admin_required
+def update_user_role(user_id):
+    try:
+        role = request.form.get('role')
+        
+        if role not in ['user', 'admin']:
+            flash('Invalid role', 'error')
+            return redirect(url_for('admin_users'))
+            
+        # Update user in the database
+        sb.update_user(user_id, {'role': role})
+        
+        flash(f'User role updated successfully', 'success')
+        return redirect(url_for('admin_users'))
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        flash('Error updating user', 'error')
+        return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/update_organization/<user_id>', methods=['POST'])
+@login_required
+@admin_required
+def update_user_organization(user_id):
+    try:
+        organization = request.form.get('organization')
+        
+        # Update user in the database
+        sb.update_user(user_id, {'Organization': organization})
+        
+        flash(f'User organization updated successfully', 'success')
+        return redirect(url_for('admin_users'))
+    except Exception as e:
+        print(f"Error updating user organization: {e}")
+        flash('Error updating user organization', 'error')
+        return redirect(url_for('admin_users'))
+
 # Register close_db function
 app.teardown_appcontext(close_db)
 
@@ -815,5 +1124,7 @@ with app.app_context():
 print(f"Template folder: {app.template_folder}")
 
 if __name__ == '__main__':
-    debug_mode = os.environ.get('DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug_mode)
+    print("Template folder:", app.template_folder)
+    # Run the app
+    debug_mode = os.environ.get("FLASK_DEBUG", "True").lower() in ('true', '1', 't')
+    app.run(debug=debug_mode, port=5001)

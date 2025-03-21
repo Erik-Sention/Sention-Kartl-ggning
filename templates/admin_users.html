@@ -22,6 +22,7 @@
                             <th>Username</th>
                             <th>Email</th>
                             <th>Full Name</th>
+                            <th>Organization</th>
                             <th>Role</th>
                             <th>Actions</th>
                         </tr>
@@ -33,12 +34,18 @@
                             <td>{{ user.email }}</td>
                             <td>{{ user.full_name }}</td>
                             <td>
+                                <form action="{{ url_for('update_user_organization', user_id=user.id) }}" method="post" class="d-inline">
+                                    <input type="text" name="organization" value="{{ user.Organization or '' }}" class="form-control form-control-sm d-inline-block" style="width: 150px;">
+                                    <button type="submit" class="btn btn-sm btn-primary luxury-btn-sm">Save</button>
+                                </form>
+                            </td>
+                            <td>
                                 <span class="badge {% if user.role == 'admin' %}badge-admin{% else %}badge-user{% endif %}">
                                     {{ user.role }}
                                 </span>
                             </td>
                             <td>
-                                <form action="{{ url_for('update_user_admin', user_id=user.id) }}" method="post" class="d-inline">
+                                <form action="{{ url_for('update_user_role', user_id=user.id) }}" method="post" class="d-inline">
                                     <select name="role" class="form-select form-select-sm d-inline-block auto-width luxury-select" aria-label="Change user role">
                                         <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
                                         <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>

@@ -1,0 +1,130 @@
+/* Popup Tooltip styles */
+.info-tooltip {
+    position: relative;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.navbar-links .info-tooltip {
+    margin: 0 2px;
+}
+
+.navbar-links .info-tooltip a {
+    display: inline-block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.2s;
+    border-radius: 4px;
+    font-weight: 500;
+    position: relative;
+}
+
+.navbar-links .info-tooltip a::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    width: 80%;
+    height: 2px;
+    background: #8c857d;
+    transform: scaleX(0);
+    transition: transform 0.3s;
+}
+
+.navbar-links .info-tooltip a:hover {
+    background-color: rgba(240, 244, 248, 0.5);
+    color: #000;
+}
+
+.navbar-links .info-tooltip a:hover::before {
+    transform: scaleX(1);
+}
+
+.navbar-links .info-tooltip a.active {
+    background: linear-gradient(135deg, rgba(167, 163, 158, 0.1) 0%, rgba(140, 133, 125, 0.2) 100%);
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-links .info-tooltip a.active::before {
+    transform: scaleX(1);
+    background: linear-gradient(90deg, transparent, #8c857d, transparent);
+    height: 3px;
+}
+
+/* Right nav buttons tooltip styles */
+.nav-buttons .info-tooltip {
+    margin: 0 2px;
+    display: inline-block;
+}
+
+.nav-buttons .info-tooltip a {
+    display: inline-block;
+}
+
+.nav-buttons .info-tooltip-content {
+    right: 0;
+    left: auto;
+    transform: none;
+}
+
+.nav-buttons .info-tooltip-content::after {
+    left: 75%;
+}
+
+.info-tooltip-content {
+    display: none;
+    position: absolute;
+    top: 100%; /* Position below the navbar instead of above */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    width: 200px;
+    padding: 20px;
+    text-align: center;
+    z-index: 1000;
+    margin-top: 10px; /* Add some space between navbar and tooltip */
+}
+
+/* Arrow on tooltip - pointing up instead of down */
+.info-tooltip-content::after {
+    content: "";
+    position: absolute;
+    top: -10px; /* Position above the tooltip box */
+    left: 50%;
+    margin-left: -10px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: transparent transparent white transparent; /* Arrow pointing up */
+}
+
+.info-icon {
+    display: block;
+    width: 40px;
+    height: 40px;
+    background-color: #f0f0f0;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    line-height: 40px;
+    font-size: 18px;
+}
+
+.info-tooltip-text {
+    color: #333;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* Show the tooltip when hovering */
+.info-tooltip:hover .info-tooltip-content {
+    display: block;
+}
+
+@keyframes tooltip-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+} 

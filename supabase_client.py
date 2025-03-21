@@ -12,9 +12,9 @@ supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
 supabase = create_client(supabase_url, supabase_key)
 
 # Create admin client with service role key (for admin operations)
-supabase_admin: Client = create_client(supabase_url, supabase_key)
+supabase_admin = create_client(supabase_url, supabase_key)
 
-def get_items(category):
+def get_items(category, user_id=None):
     """
     Get items for a specific category
     """
@@ -185,13 +185,13 @@ def create_user(username, email, password, full_name, role="user"):
         print(f"Creating user: {username}, {email}")
         
         # Check if email already exists
-        existing_users = supabase.table("users").select("*").eq("email", email).execute()
+        existing_users = supabase_admin.table("users").select("*").eq("email", email).execute()
         if existing_users.data:
             print(f"Email already exists: {email}")
             return None
             
         # Check if username already exists
-        existing_usernames = supabase.table("users").select("*").eq("username", username).execute()
+        existing_usernames = supabase_admin.table("users").select("*").eq("username", username).execute()
         if existing_usernames.data:
             print(f"Username already exists: {username}")
             return None
@@ -209,7 +209,7 @@ def create_user(username, email, password, full_name, role="user"):
         
         # Then store additional user data
         print("Storing user data...")
-        user_response = supabase.table("users").insert({
+        user_response = supabase_admin.table("users").insert({
             "id": user_id,
             "username": username,
             "email": email,
@@ -232,7 +232,7 @@ def update_user(user_id, data):
     Update user data
     """
     try:
-        response = supabase.table("users") \
+        response = supabase_admin.table("users") \
             .update(data) \
             .eq("id", user_id) \
             .execute()
@@ -247,7 +247,7 @@ def delete_user(user_id):
     """
     try:
         # First delete from users table
-        supabase.table("users") \
+        supabase_admin.table("users") \
             .delete() \
             .eq("id", user_id) \
             .execute()
@@ -265,7 +265,7 @@ def get_all_users():
     """
     try:
         print("Fetching all users from Supabase...")
-        response = supabase.table("users").select("*").execute()
+        response = supabase_admin.table("users").select("*").execute()
         print(f"Response from Supabase: {response}")
         return response.data if response.data else []
     except Exception as e:
@@ -432,11 +432,79 @@ def get_resources():
         print(f"Error getting resources: {e}")
         return []
 
+def get_organization_resources(organization=None):
+    """
+    Get resources filtered by organization
+    
+    If organization is None, returns all resources.
+    Otherwise, returns resources created by users in the specified organization.
+    """
+    try:
+        if not organization:
+            # If no organization, just return all resources
+            print("No organization specified, returning all resources")
+            return get_resources()
+        
+        print(f"Getting resources for organization: {organization}")
+        
+        # First get users in the organization
+        users_response = supabase.table("users") \
+            .select("id, username, email, Organization") \
+            .eq("Organization", organization) \
+            .execute()
+            
+        print(f"Found {len(users_response.data) if users_response.data else 0} users in organization '{organization}'")
+        
+        if not users_response.data:
+            print(f"No users found in organization: {organization}")
+            return []
+            
+        # Extract user IDs and print details for debugging
+        org_user_ids = []
+        for user in users_response.data:
+            org_user_ids.append(user["id"])
+            print(f"User in org: {user.get('username')} ({user.get('email')}), Organization: {user.get('Organization')}")
+        
+        # Print the list of user IDs
+        print(f"User IDs in organization: {org_user_ids}")
+        
+        # Now get resources created by these users
+        if len(org_user_ids) == 1:
+            # If there's only one user, use eq operator
+            response = supabase.table("resources") \
+                .select("*") \
+                .eq("user_id", org_user_ids[0]) \
+                .order("created_at") \
+                .execute()
+        else:
+            # If there are multiple users, use in_ operator
+            response = supabase.table("resources") \
+                .select("*") \
+                .in_("user_id", org_user_ids) \
+                .order("created_at") \
+                .execute()
+            
+        print(f"Found {len(response.data) if response.data else 0} resources for users in organization '{organization}'")
+        
+        if response.data:
+            # Print details of resources for debugging
+            for resource in response.data:
+                print(f"Resource: {resource.get('text')[:30]}... | User ID: {resource.get('user_id')}")
+        
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error getting organization resources: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 def add_resource(text, user_id=None):
     """
     Add a new resource
     """
     try:
+        print(f"Adding resource with text: '{text}' and user_id: {user_id}")
+        
         # Create data dictionary with text and created_at timestamp
         data = {
             "text": text,
@@ -447,12 +515,22 @@ def add_resource(text, user_id=None):
         if user_id is not None:
             data["user_id"] = user_id
             
+        print(f"Resource data being sent to database: {data}")
+        
         response = supabase.table("resources") \
             .insert(data) \
             .execute()
-        return response.data[0] if response.data else None
+            
+        if response.data:
+            print(f"Resource created successfully: {response.data[0]}")
+            return response.data[0]
+        else:
+            print(f"No data returned from resource creation: {response}")
+            return None
     except Exception as e:
         print(f"Error adding resource: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def delete_resource(resource_id):
