@@ -927,7 +927,7 @@ def dashboard():
     supabase_url = os.environ.get("SUPABASE_URL", "")
     supabase_key = os.environ.get("SUPABASE_ANON_KEY", "")
     
-    return render_template('dashboard.html', 
+    return render_template('dashboard_construction.html', 
                           current_category='dashboard',
                           supabase_url=supabase_url,
                           supabase_key=supabase_key)
