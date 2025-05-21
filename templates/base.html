@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tooltip-styles.css') }}">
+    <title>{% block title %}SENTION HR-Map{% endblock %}</title>
+    <link rel="icon" type="image/png" href="https://i.postimg.cc/FRwbMSBN/SENTION-logo-Black-Transparent-BG.png">
+    <!-- Supabase JavaScript library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="header">
+        <h2>SENTION</h2>
+        <div class="navbar-links">
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='anstalld') }}" class="{{ 'active' if current_category == 'anstalld' else '' }}">
+                    Anställd
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-person"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar individuella insatser på medarbetarnivå för samtliga anställda inom företaget                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='grupp') }}" class="{{ 'active' if current_category == 'grupp' else '' }}">
+                    Grupp
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar aktiviteter och insatser för teamutveckling, utbildning och förbättringsarbete på gruppnivå                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='organisation') }}" class="{{ 'active' if current_category == 'organisation' else '' }}">
+                    Organisation
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar övergripande insatser och policys som berör hela organisationen                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='foretagsledning') }}" class="{{ 'active' if current_category == 'foretagsledning' else '' }}">
+                    Företagsledning
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-briefcase"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar insatser specifikt relaterade till högsta ledningen: VD, ledningsgrupp och styrelse                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='managers') }}" class="{{ 'active' if current_category == 'managers' else '' }}">
+                    Managers
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-person-badge"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar insatser specifikt för mellanchefer med personalansvar, som avdelningschefer och områdeschefer                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='supervisors') }}" class="{{ 'active' if current_category == 'supervisors' else '' }}">
+                    Supervisors
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-person-check"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar insatser specifikt för första linjens chefer, som teamledare, gruppledare och arbetsledare                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('home', category='system') }}" class="{{ 'active' if current_category == 'system' else '' }}">
+                    System
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-gear"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar systemrelaterad information och inställningar
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if current_category == 'dashboard' else '' }}">
+                    Dashboard
+                </a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-speedometer2"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Visar sammanfattande information och insikter från alla sektioner
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="nav-buttons">
+            <div class="info-tooltip">
+                <a href="{{ url_for('profile') }}" class="profile-btn"><i class="bi bi-person"></i> Min profil</a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-person"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Hantera din användarprofil och personliga inställningar
+                    </div>
+                </div>
+            </div>
+            
+            {% if session.role == 'admin' %}
+            <div class="info-tooltip">
+                <a href="{{ url_for('admin_users') }}" class="admin-btn"><i class="bi bi-gear"></i> Användarhantering</a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-gear"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Administrera användare, behörigheter och systemfunktioner
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="info-tooltip">
+                <a href="{{ url_for('logout') }}" class="logout-btn"><i class="bi bi-box-arrow-right"></i> Logga ut</a>
+                <div class="info-tooltip-content">
+                    <div class="info-icon">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </div>
+                    <div class="info-tooltip-text">
+                        Logga ut från systemet och avsluta din session
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

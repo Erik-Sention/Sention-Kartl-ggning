@@ -1,0 +1,1458 @@
+{% extends "base.html" %}
+
+{% block title %}System{% endblock %}
+
+{% block content %}
+<style>
+    /* Sticky header styles */
+    thead tr th {
+        position: sticky;
+        top: 130px; /* Increased by 20px */
+        background-color: white;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Delete button styles */
+    .delete-btn {
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0 5px;
+    }
+    
+    .delete-btn:hover {
+        color: #bd2130;
+    }
+    
+    /* Enhanced table styles */
+    .table-enhanced {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .table-enhanced th, 
+    .table-enhanced td {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px;
+    }
+    
+    .table-enhanced thead th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    
+    .table-enhanced tbody tr:nth-child(even) {
+        background-color: #F0EEEE;
+    }
+    
+    .table-enhanced tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    
+    /* Add padding to the top of the table body to prevent first row from being hidden */
+    .table-enhanced tbody {
+        padding-top: 10px;
+    }
+    
+    /* Add margin to the first row to ensure it's not hidden */
+    .table-enhanced tbody tr:first-child {
+        margin-top: 45px;
+    }
+    
+    /* Add extra space before the table */
+    .table-container {
+        margin-top: 50px;
+    }
+    
+    /* Rating selector styles */
+    .rating-selector {
+        position: absolute;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 10px;
+        z-index: 100;
+        display: none;
+    }
+    
+    .rating-option {
+        padding: 8px 15px;
+        cursor: pointer;
+        border-radius: 4px;
+        margin-bottom: 5px;
+        transition: background-color 0.2s;
+    }
+    
+    .rating-option:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .rating-option:last-child {
+        margin-bottom: 0;
+    }
+    
+    .rating-cell {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    /* Button container styles */
+    .button-container {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    /* Add row button styles */
+    #add-row-btn {
+        width: 50px;
+        height: 50px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        border-radius: 6px;
+        position: relative;
+    }
+    
+    /* Empty cell placeholder styles */
+    [contenteditable="true"]:empty:before {
+        content: attr(data-placeholder);
+        color: #aaa;
+        font-style: italic;
+    }
+    
+    /* Save button styles */
+    .save-btn {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .save-btn:hover {
+        background-color: #218838;
+    }
+    
+    /* Status message styles */
+    .status-message {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 4px;
+        display: none;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    /* Auto-save indicator */
+    .auto-save-indicator {
+        display: inline-block;
+        margin-left: 15px;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    /* Saving animation */
+    .saving {
+        display: inline-block;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+    
+    /* Tooltip styles */
+    .tooltip-custom {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .tooltip-custom:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        z-index: 100;
+        margin-bottom: 5px;
+    }
+    
+    /* Cell being edited styles */
+    .cell-editing {
+        background-color: rgba(255, 255, 0, 0.1) !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+        position: relative;
+    }
+    
+    .cell-editing::after {
+        content: "Redigeras...";
+        position: absolute;
+        top: -20px;
+        left: 0;
+        background-color: rgba(0, 123, 255, 0.9);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        z-index: 100;
+    }
+    
+    /* Cell being edited by another user */
+    .cell-editing-other {
+        background-color: rgba(255, 0, 0, 0.1) !important;
+        position: relative;
+    }
+    
+    .cell-editing-other::after {
+        content: "Redigeras av annan användare";
+        position: absolute;
+        top: -20px;
+        left: 0;
+        background-color: rgba(220, 53, 69, 0.9);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        z-index: 100;
+    }
+    
+    /* Drag and drop styles */
+    .drag-handle {
+        cursor: move;
+        color: #6c757d;
+        padding: 5px;
+        margin-right: 5px;
+        opacity: 0.5;
+        transition: all 0.2s;
+        position: relative;
+    }
+    
+    .drag-handle:hover {
+        opacity: 1;
+        transform: scale(1.2);
+        color: #0d6efd;
+    }
+    
+    .drag-handle::after {
+        content: 'Dra för att ändra ordning';
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 5px;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+        pointer-events: none;
+        z-index: 1000;
+    }
+    
+    .drag-handle:hover::after {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    /* First-time user hint */
+    .drag-hint {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        padding: 20px;
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        max-width: 450px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .drag-hint-content {
+        margin-bottom: 15px;
+        font-size: 15px;
+        line-height: 1.5;
+        position: relative;
+        padding: 0 5px;
+    }
+    
+    #drag-hint-text {
+        display: block;
+        padding: 8px 0;
+        transition: opacity 0.3s ease;
+        opacity: 1;
+    }
+    
+    #drag-hint-text.fade {
+        opacity: 0;
+    }
+    
+    /* Icon styling in tips */
+    #drag-hint-text i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        vertical-align: -0.125em;
+        margin: 0 3px;
+    }
+    
+    .drag-hint-tip {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: flex-start;
+    }
+    
+    /* Improved tip navigation styling */
+    .tip-navigation {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 12px;
+        border-top: 1px solid #eee;
+        padding-top: 12px;
+    }
+    
+    .tip-nav-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        background-color: #f0f7ff;
+        border: 1px solid #d0e3ff;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #0d6efd;
+        font-size: 0.9rem;
+        padding: 0;
+        margin: 0 8px;
+    }
+    
+    .tip-nav-btn:hover {
+        background-color: #e0f0ff;
+        transform: scale(1.05);
+    }
+    
+    .tip-nav-btn:active {
+        transform: scale(0.95);
+    }
+    
+    .tip-counter {
+        font-size: 14px;
+        color: #6c757d;
+        margin: 0 10px;
+        min-width: 40px;
+        text-align: center;
+    }
+    
+    .drag-hint i {
+        font-size: 1.2rem;
+        color: #0d6efd;
+    }
+    
+    .drag-hint-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        cursor: pointer;
+        color: #999;
+        transition: color 0.2s;
+        font-size: 16px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+    }
+    
+    .drag-hint-close:hover {
+        color: #666;
+        background-color: #f0f0f0;
+    }
+    
+    /* För att positionera ikoner i tips */
+    .tip-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    
+    tr.dragging {
+        background-color: rgba(0, 123, 255, 0.1) !important;
+        opacity: 0.8;
+        cursor: move;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    tr.drag-over {
+        position: relative;
+    }
+    
+    tr.drag-over::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -2px;
+        height: 4px;
+        background-color: #0d6efd;
+        z-index: 100;
+        border-radius: 2px;
+        box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+    
+    .table-enhanced tbody tr td:first-child {
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Modal styles */
+    .modal {
+        position: fixed;
+        z-index: 1050;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        max-width: 400px;
+        width: 90%;
+        position: relative;
+        animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .close-modal {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close-modal:hover {
+        color: #333;
+    }
+    
+    .modal-footer {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+    }
+    
+    /* Help floating button */
+    .help-floating-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        z-index: 999;
+        transition: all 0.2s;
+        opacity: 0;
+        visibility: hidden;
+    }
+    
+    .help-floating-btn.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .help-floating-btn:hover {
+        transform: scale(1.1);
+        background-color: #0b5ed7;
+    }
+    
+    .help-floating-btn i {
+        font-size: 1.2rem;
+    }
+</style>
+
+<div class="container mt-4" style="margin-top: 150px !important;">
+    <div class="table-container">
+        <table class="table table-enhanced">
+            <thead>
+                <tr>
+                    <th style="width: 80px;"></th>
+                    <th>Kategori</th>
+                    <th>System</th>
+                    <th>Leverantör</th>
+                    <th>Status</th>
+                    <th>Omdöme</th>
+                </tr>
+            </thead>
+            <tbody id="system-table-body" style="padding-top: 90px;">
+                <!-- Data will be loaded from database -->
+            </tbody>
+        </table>
+        
+        <div class="button-container">
+            <button id="add-row-btn" class="btn btn-primary tooltip-custom" data-tooltip="Lägg till ny rad">+</button>
+            <div id="auto-save-indicator" class="auto-save-indicator"></div>
+        </div>
+        
+        <div id="status-message" class="status-message"></div>
+        
+        <div class="indicators mt-3">
+            <h5>Omdöme förklaring:</h5>
+            <div class="indicator">➕ Grundläggande funktionalitet</div>
+            <div class="indicator">➕➕ Används effektivt i verksamheten</div>
+            <div class="indicator">➕➕➕ Ger mätbart värde och uppfyller alla behov</div>
+        </div>
+    </div>
+</div>
+
+<!-- Rating selector popup -->
+<div id="rating-selector" class="rating-selector">
+    <div class="rating-option" onclick="selectRating('➕')">➕ Grundläggande funktionalitet</div>
+    <div class="rating-option" onclick="selectRating('➕➕')">➕➕ Används effektivt i verksamheten</div>
+    <div class="rating-option" onclick="selectRating('➕➕➕')">➕➕➕ Ger mätbart värde och uppfyller alla behov</div>
+    <div class="rating-option" onclick="selectRating('')">Ingen bedömning</div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-confirm-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeDeleteModal()">&times;</span>
+        <h4>Bekräfta borttagning</h4>
+        <p>Är du säker på att du vill ta bort denna rad?</p>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDeleteModal()">Avbryt</button>
+            <button class="btn btn-danger" onclick="confirmDelete()">Ta bort</button>
+        </div>
+    </div>
+</div>
+
+<!-- Drag hint for first-time users -->
+<div id="drag-hint" class="drag-hint" style="display: none;">
+    <span class="drag-hint-close" onclick="closeDragHint()">✕</span>
+    <h4 style="margin-top: 0; color: #0d6efd;"><i class="bi bi-lightbulb"></i> Tips &amp; Hjälp</h4>
+    <div class="drag-hint-content">
+        <span id="drag-hint-text">Du kan dra i handtaget för att ändra ordning på raderna</span>
+        <div class="tip-navigation">
+            <button class="tip-nav-btn" onclick="previousTip()"><i class="bi bi-chevron-left"></i></button>
+            <span class="tip-counter"><span id="current-tip">1</span>/<span id="total-tips">6</span></span>
+            <button class="tip-nav-btn" onclick="nextTip()"><i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+</div>
+
+<!-- Help floating button -->
+<div id="help-floating-btn" class="help-floating-btn visible" onclick="showDragHint(true)">
+    <i class="bi bi-lightbulb"></i>
+</div>
+
+<script>
+    // Initialize Supabase client with the values passed from Flask
+    const supabaseUrl = "{{ supabase_url }}";
+    const supabaseKey = "{{ supabase_key }}";
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // Set auth token if user is logged in
+    const accessToken = "{{ session.get('access_token', '') }}";
+    const refreshToken = "{{ session.get('refresh_token', '') }}";
+    
+    if (accessToken && accessToken !== "") {
+        supabaseClient.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+        });
+    }
+    
+    // Auto-save variables
+    let saveTimeout = null;
+    const saveDelay = 1000; // 1 second delay before saving
+    const autoSaveIndicator = document.getElementById('auto-save-indicator');
+    
+    // Current cell being rated
+    let currentRatingCell = null;
+    
+    // Track currently edited cell
+    let currentlyEditingCell = null;
+    let isCurrentlySaving = false;
+    
+    // Track cells being edited by other users
+    const cellsBeingEditedByOthers = new Map(); // Map of "rowIndex-colIndex" to user ID
+    
+    // Generate a unique user ID for this session
+    const sessionUserId = generateUUID();
+    
+    // Set up Supabase realtime subscription
+    function setupRealtimeSubscription() {
+        console.log("Setting up realtime subscription...");
+        
+        // Subscribe to changes in the system_data table
+        const channel = supabaseClient.channel('system_data_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'system_data'
+                },
+                (payload) => {
+                    console.log('Change received!', payload);
+                    // Only reload if we're not currently saving
+                    if (!isCurrentlySaving) {
+                        handleRealtimeChange(payload);
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log('Subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('Successfully subscribed to realtime changes!');
+                }
+            });
+            
+        // Also subscribe to the editing status channel
+        const editingChannel = supabaseClient.channel('editing_status')
+            .on(
+                'broadcast',
+                { event: 'editing' },
+                (payload) => {
+                    handleEditingStatus(payload);
+                }
+            )
+            .subscribe();
+            
+        // Set up a heartbeat to keep editing status alive
+        setInterval(() => {
+            if (currentlyEditingCell) {
+                // Re-broadcast our editing status every 5 seconds to keep it alive
+                const row = currentlyEditingCell.closest('tr');
+                const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+                const colIndex = Array.from(row.children).indexOf(currentlyEditingCell);
+                
+                broadcastEditingStatus(currentlyEditingCell, true);
+            }
+        }, 5000);
+        
+        return [channel, editingChannel];
+    }
+    
+    // Handle realtime changes
+    function handleRealtimeChange(payload) {
+        console.log('Handling realtime change:', payload);
+        
+        // Don't reload if we're currently editing a cell
+        if (currentlyEditingCell) {
+            console.log('Not reloading because user is editing a cell');
+            return;
+        }
+        
+        // Reload data from Supabase
+        loadDataFromSupabase(false); // Pass false to not show the status message
+    }
+    
+    // Handle editing status updates
+    function handleEditingStatus(payload) {
+        console.log('Editing status update:', payload);
+        
+        // If this is our own update, ignore it
+        if (payload.payload.userId === sessionUserId) {
+            return;
+        }
+        
+        const { userId, rowIndex, colIndex, isEditing } = payload.payload;
+        const cellKey = `${rowIndex}-${colIndex}`;
+        
+        // Find the cell
+        const rows = document.querySelectorAll('#system-table-body tr');
+        if (rowIndex >= 0 && rowIndex < rows.length) {
+            const cells = rows[rowIndex].querySelectorAll('td');
+            if (colIndex >= 0 && colIndex < cells.length) {
+                const cell = cells[colIndex];
+                
+                if (isEditing) {
+                    // Another user is editing this cell
+                    cell.classList.add('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'false'); // Prevent editing
+                    
+                    // Store in our map of cells being edited
+                    cellsBeingEditedByOthers.set(cellKey, userId);
+                } else {
+                    // User stopped editing
+                    cell.classList.remove('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'true'); // Allow editing again
+                    
+                    // Remove from our map
+                    cellsBeingEditedByOthers.delete(cellKey);
+                }
+            }
+        }
+    }
+    
+    // Broadcast editing status
+    function broadcastEditingStatus(cell, isEditing) {
+        // Find row and column index
+        const row = cell.closest('tr');
+        const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+        const colIndex = Array.from(row.children).indexOf(cell);
+        
+        // Broadcast editing status
+        supabaseClient.channel('editing_status').send({
+            type: 'broadcast',
+            event: 'editing',
+            payload: {
+                userId: sessionUserId,
+                rowIndex,
+                colIndex,
+                isEditing
+            }
+        });
+    }
+    
+    // Apply editing indicators for cells being edited by others
+    function applyEditingIndicators() {
+        // Clear all existing indicators first
+        document.querySelectorAll('.cell-editing-other').forEach(cell => {
+            cell.classList.remove('cell-editing-other');
+            cell.setAttribute('contenteditable', 'true');
+        });
+        
+        // Apply indicators for cells being edited by others
+        cellsBeingEditedByOthers.forEach((userId, cellKey) => {
+            const [rowIndex, colIndex] = cellKey.split('-').map(Number);
+            
+            const rows = document.querySelectorAll('#system-table-body tr');
+            if (rowIndex >= 0 && rowIndex < rows.length) {
+                const cells = rows[rowIndex].querySelectorAll('td');
+                if (colIndex >= 0 && colIndex < cells.length) {
+                    const cell = cells[colIndex];
+                    cell.classList.add('cell-editing-other');
+                    cell.setAttribute('contenteditable', 'false'); // Prevent editing
+                }
+            }
+        });
+    }
+    
+    // Function to show rating selector
+    function showRatingSelector(cell) {
+        // Store reference to current cell
+        currentRatingCell = cell;
+        
+        // Get rating selector
+        const selector = document.getElementById('rating-selector');
+        
+        // Position selector near the cell
+        const rect = cell.getBoundingClientRect();
+        selector.style.top = (rect.bottom + window.scrollY) + 'px';
+        selector.style.left = rect.left + 'px';
+        
+        // Show selector
+        selector.style.display = 'block';
+        
+        // Add event listener to close selector when clicking outside
+        document.addEventListener('click', closeRatingSelectorOutside);
+    }
+    
+    // Function to close rating selector when clicking outside
+    function closeRatingSelectorOutside(event) {
+        const selector = document.getElementById('rating-selector');
+        
+        // Check if click is outside the selector and not on a rating cell
+        if (!selector.contains(event.target) && 
+            !event.target.classList.contains('rating-cell')) {
+            selector.style.display = 'none';
+            document.removeEventListener('click', closeRatingSelectorOutside);
+        }
+    }
+    
+    // Function to select a rating
+    function selectRating(rating) {
+        if (currentRatingCell) {
+            currentRatingCell.textContent = rating;
+            
+            // Hide selector
+            document.getElementById('rating-selector').style.display = 'none';
+            document.removeEventListener('click', closeRatingSelectorOutside);
+            
+            // Trigger auto-save
+            triggerAutoSave();
+        }
+    }
+    
+    // Variables for delete confirmation
+    let rowToDelete = null;
+    
+    // Function to show delete confirmation modal
+    function showDeleteModal(button) {
+        rowToDelete = button;
+        document.getElementById('delete-confirm-modal').style.display = 'flex';
+    }
+    
+    // Function to close delete confirmation modal
+    function closeDeleteModal() {
+        document.getElementById('delete-confirm-modal').style.display = 'none';
+        rowToDelete = null;
+    }
+    
+    // Function to confirm delete
+    function confirmDelete() {
+        if (rowToDelete) {
+            const row = rowToDelete.closest('tr');
+            row.remove();
+            
+            // Trigger auto-save
+            triggerAutoSave();
+            
+            // Close the modal
+            closeDeleteModal();
+        }
+    }
+    
+    // Function to delete a row
+    function deleteRow(button) {
+        showDeleteModal(button);
+    }
+
+    document.getElementById('add-row-btn').addEventListener('click', function() {
+        const tableBody = document.getElementById('system-table-body');
+        const newRow = document.createElement('tr');
+        newRow.setAttribute('draggable', 'true');
+        newRow.addEventListener('dragstart', handleDragStart);
+        newRow.addEventListener('dragend', handleDragEnd);
+        newRow.addEventListener('dragover', handleDragOver);
+        newRow.addEventListener('drop', handleDrop);
+        newRow.innerHTML = `
+            <td>
+                <i class="bi bi-grip-vertical drag-handle"></i>
+                <button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+            <td contenteditable="true" data-placeholder="Kategori" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="System" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="Leverantör" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td contenteditable="true" data-placeholder="Status" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)"></td>
+            <td class="rating-cell" onclick="showRatingSelector(this)"></td>
+        `;
+        tableBody.appendChild(newRow);
+        
+        // Scroll to the new row to make it visible
+        newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Focus on the first editable cell of the new row
+        const firstEditableCell = newRow.querySelector('[contenteditable="true"]');
+        if (firstEditableCell) {
+            firstEditableCell.focus();
+        }
+        
+        // Trigger auto-save
+        triggerAutoSave();
+    });
+    
+    // Function to handle cell focus
+    function handleCellFocus(cell) {
+        // Mark this cell as being edited
+        currentlyEditingCell = cell;
+        cell.classList.add('cell-editing');
+        
+        // Broadcast editing status
+        broadcastEditingStatus(cell, true);
+    }
+    
+    // Function to handle cell changes
+    function handleCellChange(cell) {
+        // Remove editing indicator
+        cell.classList.remove('cell-editing');
+        
+        // Broadcast that we stopped editing
+        broadcastEditingStatus(cell, false);
+        
+        // Clear currently editing cell if it's this one
+        if (currentlyEditingCell === cell) {
+            currentlyEditingCell = null;
+        }
+        
+        // Trigger auto-save
+        triggerAutoSave();
+    }
+    
+    // Function to trigger auto-save with debounce
+    function triggerAutoSave() {
+        // Show saving indicator
+        autoSaveIndicator.innerHTML = '<span class="saving">Sparar...</span>';
+        
+        // Clear previous timeout
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+        
+        // Set new timeout
+        saveTimeout = setTimeout(() => {
+            saveDataToSupabase();
+        }, saveDelay);
+    }
+    
+    // Function to show status message
+    function showStatusMessage(message, isSuccess) {
+        const statusMessage = document.getElementById('status-message');
+        statusMessage.textContent = message;
+        statusMessage.className = 'status-message';
+        
+        if (isSuccess) {
+            statusMessage.classList.add('success-message');
+        } else {
+            statusMessage.classList.add('error-message');
+        }
+        
+        statusMessage.style.display = 'block';
+        
+        // Hide message after 5 seconds
+        setTimeout(() => {
+            statusMessage.style.display = 'none';
+        }, 5000);
+    }
+    
+    // Load data from Supabase when page loads
+    async function loadDataFromSupabase(showMessage = true) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('system_data')
+                .select('*');
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                // Clear existing rows except the first one
+                const tableBody = document.getElementById('system-table-body');
+                
+                // Save the current focus position if any
+                let activeElementIndex = -1;
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.getAttribute('contenteditable') === 'true') {
+                    const activeRow = activeElement.closest('tr');
+                    const activeCell = activeElement;
+                    if (activeRow && activeCell) {
+                        const rowIndex = Array.from(tableBody.children).indexOf(activeRow);
+                        const cellIndex = Array.from(activeRow.children).indexOf(activeCell);
+                        activeElementIndex = { rowIndex, cellIndex };
+                        
+                        // Don't reload if we're editing a cell
+                        if (currentlyEditingCell) {
+                            console.log('Not reloading because user is editing a cell');
+                            return;
+                        }
+                    }
+                }
+                
+                // Store current scroll position
+                const scrollPosition = window.scrollY;
+                
+                tableBody.innerHTML = '';
+                
+                // Add rows from Supabase data
+                data.forEach(item => {
+                    const newRow = document.createElement('tr');
+                    newRow.setAttribute('draggable', 'true');
+                    newRow.addEventListener('dragstart', handleDragStart);
+                    newRow.addEventListener('dragend', handleDragEnd);
+                    newRow.addEventListener('dragover', handleDragOver);
+                    newRow.addEventListener('drop', handleDrop);
+                    newRow.innerHTML = `
+                        <td>
+                            <i class="bi bi-grip-vertical drag-handle"></i>
+                            <button class="delete-btn tooltip-custom" data-tooltip="Ta bort rad" onclick="deleteRow(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.kategori || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.system || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.leverantor || ''}</td>
+                        <td contenteditable="true" onblur="handleCellChange(this)" onfocus="handleCellFocus(this)">${item.status || ''}</td>
+                        <td class="rating-cell" onclick="showRatingSelector(this)">${item.omdome || ''}</td>
+                    `;
+                    tableBody.appendChild(newRow);
+                });
+                
+                // Initialize drag and drop for the loaded rows
+                initializeDragAndDrop();
+                
+                // Restore focus if we had an active element
+                if (activeElementIndex !== -1) {
+                    const rows = tableBody.querySelectorAll('tr');
+                    if (activeElementIndex.rowIndex < rows.length) {
+                        const cells = rows[activeElementIndex.rowIndex].querySelectorAll('td');
+                        if (activeElementIndex.cellIndex < cells.length) {
+                            cells[activeElementIndex.cellIndex].focus();
+                            
+                            // Place cursor at the end of the text
+                            const range = document.createRange();
+                            const sel = window.getSelection();
+                            const textNode = cells[activeElementIndex.cellIndex].childNodes[0];
+                            if (textNode) {
+                                range.setStart(textNode, textNode.length);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        }
+                    }
+                }
+                
+                // Restore scroll position
+                window.scrollTo(0, scrollPosition);
+                
+                // Re-apply editing indicators for cells being edited by others
+                applyEditingIndicators();
+                
+                if (showMessage) {
+                    showStatusMessage('Data laddad från databasen', true);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showStatusMessage('Ett fel uppstod när data skulle laddas: ' + error.message, false);
+        }
+    }
+    
+    // Function to collect table data
+    function collectTableData() {
+        const rows = document.querySelectorAll('#system-table-body tr');
+        const data = [];
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            
+            // Skip the first cell (delete button)
+            const rowData = {
+                kategori: cells[1].textContent.trim(),
+                system: cells[2].textContent.trim(),
+                leverantor: cells[3].textContent.trim(),
+                status: cells[4].textContent.trim(),
+                omdome: cells[5].textContent.trim()
+            };
+            
+            data.push(rowData);
+        });
+        
+        return data;
+    }
+    
+    // Function to save data to Supabase
+    async function saveDataToSupabase(event) {
+        try {
+            // Set flag that we're saving
+            isCurrentlySaving = true;
+            
+            const tableData = collectTableData();
+            
+            // Check if user is authenticated
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            
+            if (!session) {
+                // If not authenticated, try to use service role key
+                const serviceClient = supabase.createClient(
+                    supabaseUrl,
+                    "{{ service_key }}", // This should be passed from Flask
+                    {
+                        auth: {
+                            autoRefreshToken: false,
+                            persistSession: false
+                        }
+                    }
+                );
+                
+                // First, delete all existing data
+                const { error: deleteError } = await serviceClient
+                    .from('system_data')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+                
+                if (deleteError) throw deleteError;
+                
+                // Then insert new data
+                const { error: insertError } = await serviceClient
+                    .from('system_data')
+                    .insert(tableData);
+                
+                if (insertError) throw insertError;
+            } else {
+                // User is authenticated, proceed normally
+                // First, delete all existing data
+                const { error: deleteError } = await supabaseClient
+                    .from('system_data')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+                
+                if (deleteError) throw deleteError;
+                
+                // Then insert new data
+                const { error: insertError } = await supabaseClient
+                    .from('system_data')
+                    .insert(tableData);
+                
+                if (insertError) throw insertError;
+            }
+            
+            // Update auto-save indicator
+            autoSaveIndicator.innerHTML = 'Sparad';
+            setTimeout(() => {
+                autoSaveIndicator.innerHTML = '';
+            }, 2000);
+            
+            // Reset saving flag
+            isCurrentlySaving = false;
+            
+        } catch (error) {
+            console.error('Error saving data:', error);
+            
+            // Update auto-save indicator
+            autoSaveIndicator.innerHTML = 'Fel vid sparande';
+            
+            // Show error message
+            showStatusMessage('Ett fel uppstod när data skulle sparas: ' + error.message, false);
+            
+            // Reset saving flag
+            isCurrentlySaving = false;
+        }
+    }
+    
+    // Generate UUID for new rows
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM loaded, Supabase URL:", supabaseUrl);
+        console.log("Supabase Key:", supabaseKey ? "Key exists" : "Key missing");
+        
+        if (supabaseUrl && supabaseKey) {
+            // Load initial data
+            loadDataFromSupabase();
+            
+            // Set up realtime subscription
+            const channels = setupRealtimeSubscription();
+            
+            // Clean up subscription when page unloads
+            window.addEventListener('beforeunload', () => {
+                console.log('Cleaning up subscription...');
+                
+                // Broadcast that we stopped editing any cell
+                if (currentlyEditingCell) {
+                    broadcastEditingStatus(currentlyEditingCell, false);
+                }
+                
+                channels.forEach(channel => {
+                    supabaseClient.removeChannel(channel);
+                });
+            });
+            
+            // Visa hjälpknappen och initiera tips-systemet
+            showHelpButton();
+            
+            // Initialize drag and drop for any existing rows
+            initializeDragAndDrop();
+        } else {
+            console.error('Supabase configuration is missing');
+            showStatusMessage('Kunde inte ansluta till databasen: Konfiguration saknas', false);
+        }
+    });
+    
+    // Tips for the drag hint popup
+    const tips = [
+        "Klicka på cellen för att redigera, tryck Enter när du är klar.",
+        "Du kan dra i handtaget för att ändra ordning på raderna.",
+        "Tryck på plus-knappen för att lägga till en ny rad.",
+        "Klicka på omdömes-cellen för att sätta ett betyg.",
+        "Alla ändringar sparas automatiskt.", 
+        "Ta bort en rad genom att klicka på papperskorgen.",
+    ];
+    
+    let currentTipIndex = 0;
+    
+    // Function to show drag hint
+    function showDragHint(forceShow = false) {
+        if (forceShow || !localStorage.getItem('dragHintSeen')) {
+            const dragHint = document.getElementById('drag-hint');
+            dragHint.style.display = 'flex';
+            
+            // Set total tips counter
+            document.getElementById('total-tips').textContent = tips.length;
+            
+            // Show first tip
+            showTip(0);
+            
+            // Hide the help floating button
+            document.getElementById('help-floating-btn').classList.remove('visible');
+        }
+    }
+    
+    // Function to show a specific tip
+    function showTip(index) {
+        // Ensure index is within bounds
+        if (index < 0) index = tips.length - 1;
+        if (index >= tips.length) index = 0;
+        
+        currentTipIndex = index;
+        
+        // Add fade out effect
+        const tipText = document.getElementById('drag-hint-text');
+        tipText.classList.add('fade');
+        
+        // Update content after short delay for transition
+        setTimeout(() => {
+            tipText.innerHTML = tips[index];
+            document.getElementById('current-tip').textContent = index + 1;
+            
+            // Remove fade class to fade back in
+            setTimeout(() => {
+                tipText.classList.remove('fade');
+            }, 50);
+        }, 200);
+    }
+    
+    // Function to show next tip
+    function nextTip() {
+        showTip(currentTipIndex + 1);
+    }
+    
+    // Function to show previous tip
+    function previousTip() {
+        showTip(currentTipIndex - 1);
+    }
+    
+    // Function to show help button
+    function showHelpButton() {
+        const helpButton = document.getElementById('help-floating-btn');
+        helpButton.classList.add('visible');
+    }
+    
+    // Function to hide help button
+    function hideHelpButton() {
+        const helpButton = document.getElementById('help-floating-btn');
+        helpButton.classList.remove('visible');
+    }
+    
+    // Make the current_category variable available to the template
+    const currentCategory = "system";
+    
+    // Drag and drop functionality
+    let draggedRow = null;
+    
+    function handleDragStart(e) {
+        // Only allow dragging if we're not editing a cell
+        if (currentlyEditingCell) {
+            e.preventDefault();
+            return;
+        }
+        
+        draggedRow = this;
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+    }
+    
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        
+        // Remove drag-over class from all rows
+        const rows = document.querySelectorAll('#system-table-body tr');
+        rows.forEach(row => row.classList.remove('drag-over'));
+        
+        draggedRow = null;
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        
+        // Don't allow dragging if any cell is being edited
+        if (currentlyEditingCell) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (row && row !== draggedRow) {
+            // Remove drag-over class from all rows
+            const rows = document.querySelectorAll('#system-table-body tr');
+            rows.forEach(r => r.classList.remove('drag-over'));
+            
+            // Get mouse position relative to the row
+            const rect = row.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const threshold = rect.top + (rect.height / 2);
+            
+            // Add drag-over class to the appropriate row
+            if (mouseY < threshold) {
+                row.classList.add('drag-over');
+            } else {
+                // If mouse is in bottom half, add class to next row if it exists
+                const nextRow = row.nextElementSibling;
+                if (nextRow) {
+                    nextRow.classList.add('drag-over');
+                } else {
+                    // If there's no next row, add class to current row
+                    row.classList.add('drag-over');
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        // Don't allow dropping if any cell is being edited
+        if (currentlyEditingCell) {
+            return;
+        }
+        
+        const row = e.target.closest('tr');
+        if (draggedRow && row && row !== draggedRow) {
+            // Get mouse position relative to the row
+            const rect = row.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const threshold = rect.top + (rect.height / 2);
+            
+            // Remove drag-over class
+            row.classList.remove('drag-over');
+            
+            // Insert the row based on mouse position
+            if (mouseY < threshold) {
+                row.parentNode.insertBefore(draggedRow, row);
+            } else {
+                row.parentNode.insertBefore(draggedRow, row.nextSibling);
+            }
+            
+            // Trigger auto-save to save the new order
+            triggerAutoSave();
+        }
+        
+        return false;
+    }
+    
+    // Initialize drag and drop for existing rows
+    function initializeDragAndDrop() {
+        const rows = document.querySelectorAll('#system-table-body tr');
+        rows.forEach(row => {
+            row.setAttribute('draggable', 'true');
+            row.addEventListener('dragstart', handleDragStart);
+            row.addEventListener('dragend', handleDragEnd);
+            row.addEventListener('dragover', handleDragOver);
+            row.addEventListener('drop', handleDrop);
+            
+            // Add drag handle to first cell if it doesn't exist
+            const firstCell = row.querySelector('td:first-child');
+            if (firstCell && !firstCell.querySelector('.drag-handle')) {
+                const dragHandle = document.createElement('i');
+                dragHandle.className = 'bi bi-grip-vertical drag-handle';
+                firstCell.insertBefore(dragHandle, firstCell.firstChild);
+            }
+        });
+    }
+
+    function closeDragHint() {
+        const hint = document.querySelector('.drag-hint');
+        if (hint) {
+            hint.style.display = 'none';
+            localStorage.setItem('dragHintSeen', 'true');
+            
+            // Show the help button
+            document.getElementById('help-floating-btn').classList.add('visible');
+        }
+    }
+</script>
+{% endblock %} 

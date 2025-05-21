@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}SENTION Dashboard - Under Construction{% endblock %}
+
+{% block content %}
+<div class="construction-container">
+    <div class="construction-icon">
+        <i class="bi bi-tools"></i>
+    </div>
+    <h1 class="construction-title">Dashboard Under Construction</h1>
+    <p class="construction-description">
+        Vi arbetar för närvarande med att utveckla en avancerad dashboard med visualiseringar och sammanfattande information från alla sektioner. Den kommer snart att vara tillgänglig med kraftfulla funktioner för att hjälpa dig få värdefulla insikter.
+    </p>
+    
+    <div class="progress-container">
+        <div class="progress-bar"></div>
+    </div>
+    
+    <div class="features-coming">
+        <h3 style="margin-bottom: 20px; color: #555;">Kommande funktioner:</h3>
+        
+        <div class="feature-item">
+            <div class="feature-icon">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <div class="feature-text">
+                Interaktiva datavisualiseringar för alla kategorier
+            </div>
+        </div>
+        
+        <div class="feature-item">
+            <div class="feature-icon">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div class="feature-text">
+                Översikt av planerade insatser och aktiviteter
+            </div>
+        </div>
+        
+        <div class="feature-item">
+            <div class="feature-icon">
+                <i class="bi bi-lightning"></i>
+            </div>
+            <div class="feature-text">
+                Snabba åtkomstgenvägar till viktiga resurser
+            </div>
+        </div>
+        
+        <div class="feature-item">
+            <div class="feature-icon">
+                <i class="bi bi-file-earmark-pdf"></i>
+            </div>
+            <div class="feature-text">
+                Exportfunktioner för rapporter och sammanställningar
+            </div>
+        </div>
+    </div>
+    
+    <a href="{{ url_for('home', category='anstalld') }}" class="return-button">
+        <i class="bi bi-arrow-left"></i> Återgå till Huvudsidan
+    </a>
+</div>
+
+<style>
+    .construction-container {
+        max-width: 1000px;
+        margin: 50px auto;
+        text-align: center;
+        background-color: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        padding: 40px;
+        animation: fadeIn 1s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .construction-icon {
+        font-size: 100px;
+        color: #8c857d;
+        margin-bottom: 30px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .construction-title {
+        font-size: 36px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .construction-description {
+        font-size: 18px;
+        color: #666;
+        line-height: 1.6;
+        margin-bottom: 30px;
+    }
+
+    .progress-container {
+        width: 70%;
+        margin: 0 auto 30px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        height: 25px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        width: 75%;
+        height: 100%;
+        background: linear-gradient(to right, #8c857d, #a19a91);
+        border-radius: 10px;
+        animation: progressAnimation 3s ease-in-out;
+    }
+
+    @keyframes progressAnimation {
+        0% {
+            width: 0%;
+        }
+        100% {
+            width: 75%;
+        }
+    }
+
+    .features-coming {
+        text-align: left;
+        max-width: 600px;
+        margin: 0 auto 30px;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .feature-icon {
+        font-size: 24px;
+        color: #8c857d;
+        margin-right: 15px;
+    }
+
+    .feature-text {
+        font-size: 16px;
+        color: #555;
+    }
+
+    .return-button {
+        display: inline-block;
+        padding: 12px 25px;
+        background-color: #8c857d;
+        color: white;
+        text-decoration: none;
+        border-radius: 30px;
+        font-weight: 500;
+        transition: all 0.3s;
+        margin-top: 20px;
+    }
+
+    .return-button:hover {
+        background-color: #736d66;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %} 
